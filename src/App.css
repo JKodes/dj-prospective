@@ -6,8 +6,8 @@
   filter: drop-shadow(0 0 2em #61dafb);
 }
 :root {
-  --font-main: "Orbitron", sans-serif;
-  --font-button: "Chokokutai", sans-serif;
+  --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-button: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
@@ -116,8 +116,6 @@ button {
   }
 }
 
-
-
 /* CrateFire Typography */
 
 html,
@@ -127,10 +125,21 @@ body,
 }
 
 body,
-h1, h2, h3, h4, h5, h6,
-p, span, label,
-input, select, textarea,
-table, th, td {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+label,
+input,
+select,
+textarea,
+table,
+th,
+td {
   font-family: var(--font-main);
   font-weight: 400;
 }
@@ -145,4 +154,125 @@ button,
 .delete-btn {
   font-family: var(--font-button);
   font-weight: 400;
+}
+
+/* Mix Tracklist Editor */
+
+.tracklist-page h2 {
+  font-family: var(--font-main);
+  font-size: 21px;
+  font-weight: 400;
+}
+
+.tracklist-page .form-label {
+  font-family: var(--font-main);
+  color: #d9dfe9;
+  font-size: 13px;
+}
+
+.tracklist-page .form-control {
+  background: #10141d;
+  color: #ffffff;
+  border: 1px solid #414c60;
+  font-family: var(--font-main);
+}
+
+.tracklist-page .form-control:focus {
+  background: #10141d;
+  color: #ffffff;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(255, 123, 50, 0.2);
+}
+
+.tracklist-page .form-control::placeholder {
+  color: #828d9f;
+}
+
+.tracklist-page .songs-table td:first-child {
+  color: #ff7b32;
+  font-weight: 700;
+}
+
+.tracklist-page .flame {
+  transition: opacity 0.15s ease;
+}
+
+/* Mix Manager and Tracklist */
+
+.mix-manager h2,
+.mix-manager h3,
+.tracklist-page h2 {
+  font-family: var(--font-main);
+  font-weight: 400;
+}
+
+.tracklist-page .form-control,
+.tracklist-page textarea {
+  background-color: #10141d;
+  color: white;
+  border: 1px solid #414c60;
+  font-family: var(--font-main);
+}
+
+.tracklist-page .form-control:focus {
+  background-color: #10141d;
+  color: white;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(255, 123, 50, 0.2);
+}
+
+.tracklist-page .form-control::placeholder {
+  color: #8d97a8;
+}
+
+.tracklist-page .form-label {
+  color: #d9dfe9;
+  font-family: var(--font-main);
+}
+
+.tracklist-page .songs-table td:first-child {
+  color: var(--accent);
+}
+
+.flame {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.flame:hover {
+  transform: scale(1.1);
+}
+
+.flame:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.flame:disabled {
+  cursor: not-allowed;
+}
+
+.mix-manager .search-box input,
+.tracklist-page .search-box input {
+  font-family: var(--font-main);
+}
+
+
+/* CrateFire Default Typography */
+
+html,
+body,
+#root {
+  font-family: var(--font-main);
+}
+
+body,
+h1, h2, h3, h4, h5, h6,
+p, span, label, input,
+select, textarea, table,
+th, td, button, .btn,
+.nav-link-custom {
+  font-family: var(--font-main);
 }
