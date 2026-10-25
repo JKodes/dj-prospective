@@ -69,3 +69,44 @@ export async function loadMixWorkspace(): Promise<WorkspaceMix[]> {
       })),
   }));
 }
+
+
+
+
+export type NewMixInput = {
+  title: string;
+  dj_name: string;
+  genre: string;
+  source_url: string;
+  notes: string;
+};
+
+export async function createResearchMix(
+  input: NewMixInput
+): Promise<string> {
+  const title = input.title.trim();
+  const djName = input.dj_name.trim();
+
+  if (!title || !djName) {
+    throw new Error("Mix title and DJ name are required.");
+  }
+
+  const db = await getDatabase();
+  const id = crypto.randomUUID();
+
+  await db.execute(
+    `INSERT INTO mixes
+      (id, title, dj_name, genre, source_url, notes)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      id,
+      title,
+      djName,
+      input.genre.trim(),
+      input.source_url.trim(),
+      input.notes.trim(),
+    ]
+  );
+
+  return id;
+}
