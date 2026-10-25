@@ -1,338 +1,373 @@
-
-import { useState, type FormEvent } from "react";
+import { useMemo, useState } from "react";
 import {
   Flame,
-  LayoutDashboard,
-  Library,
+  Disc3,
   ListMusic,
-  Plus,
+  Search,
+  ArrowRight,
   Music2,
-  Trash2,
 } from "lucide-react";
+
+import "./App.css";
 
 type Song = {
   id: string;
   title: string;
   artist: string;
-  rating: number;
 };
 
-type Page = "dashboard" | "library" | "crates";
+type DJMix = {
+  id: string;
+  title: string;
+  dj: string;
+  genre: string;
+  tracks: Song[];
+};
 
-const STORAGE_KEY = "cratefire-songs-v1";
+const songs: Record<string, Song> = {
+  a: { id: "a", title: "Song A", artist: "Artist One" },
+  b: { id: "b", title: "Song B", artist: "Artist Two" },
+  c: { id: "c", title: "Song C", artist: "Artist Three" },
+  d: { id: "d", title: "Song D", artist: "Artist Four" },
+  e: { id: "e", title: "Song E", artist: "Artist Five" },
+  f: { id: "f", title: "Song F", artist: "Artist Six" },
+  g: { id: "g", title: "Song G", artist: "Artist Seven" },
+  h: { id: "h", title: "Song H", artist: "Artist Eight" },
+  i: { id: "i", title: "Song I", artist: "Artist Nine" },
+  j: { id: "j", title: "Song J", artist: "Artist Ten" },
+  k: { id: "k", title: "Song K", artist: "Artist Eleven" },
+  l: { id: "l", title: "Song L", artist: "Artist Twelve" },
+  m: { id: "m", title: "Song M", artist: "Artist Thirteen" },
+  n: { id: "n", title: "Song N", artist: "Artist Fourteen" },
+  o: { id: "o", title: "Song O", artist: "Artist Fifteen" },
+};
 
-function getSavedSongs(): Song[] {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
-  }
-}
+const demoMixes: DJMix[] = [
+  {
+    id: "mix-1",
+    title: "Friday Night Mix",
+    dj: "DJ Marcus",
+    genre: "Dancehall / Open Format",
+    tracks: [
+      songs.a, songs.b, songs.c, songs.d,
+      songs.e, songs.f, songs.g, songs.h,
+    ],
+  },
+  {
+    id: "mix-2",
+    title: "Summer Sessions",
+    dj: "DJ Rico",
+    genre: "Afrobeats / Dancehall",
+    tracks: [
+      songs.i, songs.j, songs.c, songs.k,
+      songs.l, songs.m, songs.n, songs.o,
+    ],
+  },
+  {
+    id: "mix-3",
+    title: "Party Takeover",
+    dj: "DJ Nova",
+    genre: "Open Format",
+    tracks: [
+      songs.h, songs.a, songs.c, songs.g,
+      songs.j, songs.k, songs.e, songs.f,
+    ],
+  },
+];
 
-function App() {
-  const [page, setPage] = useState<Page>("dashboard");
-  const [songs, setSongs] = useState<Song[]>(getSavedSongs);
-  const [showForm, setShowForm] = useState(false);
-  const [title, setTitle] = useState("");
-  const [artist, setArtist] = useState("");
-  const [rating, setRating] = useState(3);
+export default function App() {
+  const [selectedSong, setSelectedSong] = useState<string | null>("c");
+  const [hoveredSong, setHoveredSong] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  function saveSongs(updated: Song[]) {
-    setSongs(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  }
+  const [ratings, setRatings] = useState<Record<string, number>>({
+    a: 4,
+    b: 3,
+    c: 5,
+    d: 2,
+    e: 4,
+    f: 3,
+    g: 5,
+    h: 4,
+    i: 3,
+    j: 4,
+    k: 3,
+    l: 5,
+    m: 2,
+    n: 4,
+    o: 3,
+  });
 
-  function addSong(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  // Hover previews a song. Clicking makes the selection persistent.
+  const activeSong = hoveredSong ?? selectedSong;
 
-    if (!title.trim()) return;
+  // Find every occurrence of the selected song in every mix.
+  const appearances = useMemo(() => {
+    if (!activeSong) return [];
 
-    const song: Song = {
-      id: crypto.randomUUID(),
-      title: title.trim(),
-      artist: artist.trim(),
-      rating,
-    };
-
-    saveSongs([song, ...songs]);
-    setTitle("");
-    setArtist("");
-    setRating(3);
-    setShowForm(false);
-  }
-
-  function rateSong(id: string, value: number) {
-    saveSongs(
-      songs.map((song) =>
-        song.id === id ? { ...song, rating: value } : song
+    return demoMixes.flatMap((mix) =>
+      mix.tracks.flatMap((song, index) =>
+        song.id === activeSong
+          ? [{
+              mixId: mix.id,
+              mixTitle: mix.title,
+              dj: mix.dj,
+              position: index + 1,
+              nextTracks: mix.tracks.slice(index + 1, index + 6),
+            }]
+          : []
       )
     );
+  }, [activeSong]);
+
+  function getTrackState(
+    mix: DJMix,
+    index: number
+  ): "selected" | "following" | "normal" {
+    if (!activeSong) return "normal";
+
+    if (mix.tracks[index].id === activeSong) {
+      return "selected";
+    }
+
+    // Support multiple appearances within the same mix.
+    const isFollowing = mix.tracks.some(
+      (track, selectedIndex) =>
+        track.id === activeSong &&
+        index > selectedIndex &&
+        index <= selectedIndex + 5
+    );
+
+    return isFollowing ? "following" : "normal";
   }
 
-  function deleteSong(id: string) {
-    saveSongs(songs.filter((song) => song.id !== id));
+  function updateRating(songId: string, value: number) {
+    setRatings((current) => ({
+      ...current,
+      [songId]: value,
+    }));
   }
 
-  const favorites = songs.filter((song) => song.rating === 5);
+  const currentSong = activeSong ? songs[activeSong] : null;
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="logo">
-          <Flame size={29} />
-          <span>CRATEFIRE</span>
+    <div className="cratefire-app">
+      <aside className="cf-sidebar">
+        <div className="cf-logo">
+          <Flame size={27} />
+          <span>CrateFire</span>
         </div>
 
-        <p className="sidebar-label">WORKSPACE</p>
+        <p className="cf-nav-heading">WORKSPACE</p>
 
-        <nav className="d-grid gap-2">
-          <button
-            className={`nav-link-custom ${
-              page === "dashboard" ? "active" : ""
-            }`}
-            onClick={() => setPage("dashboard")}
-          >
-            <LayoutDashboard size={19} />
-            Dashboard
+        <nav className="cf-nav">
+          <button className="cf-nav-link active">
+            <Disc3 size={19} />
+            DJ Mixes
           </button>
 
-          <button
-            className={`nav-link-custom ${
-              page === "library" ? "active" : ""
-            }`}
-            onClick={() => setPage("library")}
-          >
-            <Library size={19} />
-            Music Library
+          <button className="cf-nav-link" disabled title="Coming later">
+            <Search size={19} />
+            Song Discovery
           </button>
 
-          <button
-            className={`nav-link-custom ${
-              page === "crates" ? "active" : ""
-            }`}
-            onClick={() => setPage("crates")}
-          >
+          <button className="cf-nav-link" disabled title="Coming later">
             <ListMusic size={19} />
             My Crates
           </button>
         </nav>
 
-        <div className="sidebar-bottom">
-          PERSONAL DJ WORKSPACE
+        <div className="cf-sidebar-bottom">
+          Personal DJ Research Workspace
         </div>
       </aside>
 
-      <main className="main-area">
-        <div className="page-heading">
+      <main className="cf-main">
+        <header className="cf-header">
           <div>
-            <p className="eyebrow">YOUR MUSIC. YOUR TASTE.</p>
-            <h1>
-              {page === "dashboard"
-                ? "Dashboard"
-                : page === "library"
-                ? "Music Library"
-                : "My Crates"}
-            </h1>
+            <p className="cf-eyebrow">MIX RESEARCH WORKSPACE</p>
+            <h1>DJ Mix Comparison</h1>
+            <p className="cf-muted">
+              Discover how other DJs sequence their tracks.
+            </p>
           </div>
 
-          <button
-            className="btn fire-button"
-            onClick={() => setShowForm(true)}
-          >
-            <Plus size={18} />
-            ADD SONG
-          </button>
-        </div>
+          <div className="cf-mix-count">
+            <Disc3 size={18} />
+            {demoMixes.length} Mixes
+          </div>
+        </header>
 
-        {page === "dashboard" && (
-          <div className="row g-3 mb-4">
-            <div className="col-md-4">
-              <div className="stat-card">
-                <Music2 />
-                <p>Total Songs</p>
-                <h2>{songs.length}</h2>
-              </div>
-            </div>
+        <section className="cf-toolbar">
+          <div className="cf-search">
+            <Search size={18} />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => {
+                const term = event.target.value;
+                setSearch(term);
 
-            <div className="col-md-4">
-              <div className="stat-card">
-                <Flame />
-                <p>5-Fire Songs</p>
-                <h2>{favorites.length}</h2>
-              </div>
-            </div>
+                if (!term.trim()) return;
 
-            <div className="col-md-4">
-              <div className="stat-card">
-                <ListMusic />
-                <p>Party Crates</p>
-                <h2>0</h2>
+                const match = Object.values(songs).find(
+                  (song) =>
+                    song.title.toLowerCase().includes(term.toLowerCase()) ||
+                    song.artist.toLowerCase().includes(term.toLowerCase())
+                );
+
+                if (match) setSelectedSong(match.id);
+              }}
+              placeholder="Search a song or artist..."
+              aria-label="Search songs"
+            />
+          </div>
+
+          <div className="cf-legend">
+            <span><i className="cf-key selected" /> Matching song</span>
+            <span><i className="cf-key following" /> Next 5 songs</span>
+          </div>
+        </section>
+
+        <section
+          className="cf-mix-grid"
+          onMouseLeave={() => setHoveredSong(null)}
+        >
+          {demoMixes.map((mix) => (
+            <article className="cf-mix-card" key={mix.id}>
+              <div className="cf-mix-heading">
+                <Disc3 size={25} className="cf-accent" />
+                <h2>{mix.title}</h2>
+                <p>{mix.dj}</p>
+                <span className="cf-genre">{mix.genre}</span>
               </div>
+
+              <div className="cf-tracks">
+                {mix.tracks.map((song, index) => {
+                  const state = getTrackState(mix, index);
+
+                  return (
+                    <button
+                      key={`${mix.id}-${index}`}
+                      type="button"
+                      className={`cf-track ${state}`}
+                      onMouseEnter={() => setHoveredSong(song.id)}
+                      onFocus={() => setHoveredSong(song.id)}
+                      onClick={() => setSelectedSong(song.id)}
+                      aria-pressed={state === "selected"}
+                    >
+                      <span className="cf-track-number">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+
+                      <span className="cf-track-info">
+                        <strong>{song.title}</strong>
+                        <small>{song.artist}</small>
+                      </span>
+
+                      {state === "selected" && (
+                        <Flame size={16} className="cf-accent" />
+                      )}
+
+                      {state === "following" && (
+                        <ArrowRight size={15} className="cf-next-icon" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </article>
+          ))}
+        </section>
+
+        <section className="cf-inspector">
+          <div className="cf-inspector-heading">
+            <Music2 size={22} className="cf-accent" />
+            <div>
+              <h2>Song Reference</h2>
+              <p>Explore appearances across saved mixes.</p>
             </div>
           </div>
-        )}
 
-        {page === "crates" ? (
-          <section className="content-card text-center py-5">
-            <ListMusic size={38} className="accent-icon" />
-            <h2 className="mt-3">Your Party Crates</h2>
-            <p className="muted">
-              We'll build your crate management system next.
-            </p>
-          </section>
-        ) : (
-          <section className="content-card">
-            <h2>
-              {page === "dashboard"
-                ? "Recently Added Songs"
-                : "All Songs"}
-            </h2>
-            <p className="muted">
-              Keep track of the songs you discover.
-            </p>
+          {currentSong ? (
+            <>
+              <div className="cf-song-details">
+                <div>
+                  <h3>{currentSong.title}</h3>
+                  <p>{currentSong.artist}</p>
+                </div>
 
-            {songs.length === 0 ? (
-              <div className="empty-state">
-                <Music2 size={38} />
-                <p>No songs added yet.</p>
-                <span>
-                  Click ADD SONG to start your collection.
-                </span>
-              </div>
-            ) : (
-              <div className="table-responsive">
-                <table className="table songs-table">
-                  <thead>
-                    <tr>
-                      <th>SONG TITLE</th>
-                      <th>ARTIST</th>
-                      <th>FIRE RATING</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {songs.map((song) => (
-                      <tr key={song.id}>
-                        <td>{song.title}</td>
-                        <td>{song.artist || "—"}</td>
-                        <td>
-                          <div className="flames">
-                            {[1, 2, 3, 4, 5].map((value) => (
-                              <button
-                                key={value}
-                                className={
-                                  value <= song.rating
-                                    ? "flame active"
-                                    : "flame"
-                                }
-                                onClick={() =>
-                                  rateSong(song.id, value)
-                                }
-                                aria-label={`Rate ${song.title} ${value} out of 5`}
-                              >
-                                🔥
-                              </button>
-                            ))}
-                          </div>
-                        </td>
-                        <td>
-                          <button
-                            className="delete-btn"
-                            onClick={() => deleteSong(song.id)}
-                            aria-label={`Delete ${song.title}`}
-                          >
-                            <Trash2 size={17} />
-                          </button>
-                        </td>
-                      </tr>
+                <div className="cf-rating">
+                  <span>YOUR RATING</span>
+                  <div className="cf-fires">
+                    {[1, 2, 3, 4, 5].map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={
+                          value <= (ratings[currentSong.id] ?? 0)
+                            ? "cf-fire lit"
+                            : "cf-fire"
+                        }
+                        onClick={() =>
+                          updateRating(currentSong.id, value)
+                        }
+                        aria-label={`Rate ${value} fires`}
+                        aria-pressed={
+                          ratings[currentSong.id] === value
+                        }
+                      >
+                        🔥
+                      </button>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </div>
               </div>
-            )}
-          </section>
-        )}
 
-        {showForm && (
-          <div className="custom-backdrop">
-            <section
-              className="add-song-modal"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="add-song-title"
-            >
-              <h2 id="add-song-title">Add New Song</h2>
-              <p className="muted">
-                Add a title to your personal DJ catalog.
+              <p className="cf-reference-count">
+                Found {appearances.length} time(s) across{" "}
+                {new Set(appearances.map((a) => a.mixId)).size} mix(es)
               </p>
 
-              <form onSubmit={addSong}>
-                <label className="form-label">
-                  Song Title
-                </label>
-                <input
-                  className="form-control mb-3"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  autoFocus
-                />
-
-                <label className="form-label">
-                  Artist
-                </label>
-                <input
-                  className="form-control mb-3"
-                  value={artist}
-                  onChange={(e) => setArtist(e.target.value)}
-                />
-
-                <label className="form-label">
-                  Fire Rating
-                </label>
-                <div className="flames mb-4">
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={
-                        value <= rating
-                          ? "flame active"
-                          : "flame"
-                      }
-                      onClick={() => setRating(value)}
-                      aria-label={`Select ${value} fires`}
-                    >
-                      🔥
-                    </button>
-                  ))}
-                </div>
-
-                <div className="d-flex gap-2 justify-content-end">
-                  <button
-                    type="button"
-                    className="btn cancel-button"
-                    onClick={() => setShowForm(false)}
+              <div className="cf-reference-grid">
+                {appearances.map((appearance) => (
+                  <div
+                    className="cf-reference-card"
+                    key={`${appearance.mixId}-${appearance.position}`}
                   >
-                    CANCEL
-                  </button>
+                    <h4>{appearance.mixTitle}</h4>
+                    <p>
+                      {appearance.dj} · Track #{appearance.position}
+                    </p>
+                    <strong>Next five tracks</strong>
 
-                  <button
-                    type="submit"
-                    className="btn fire-button"
-                  >
-                    SAVE SONG
-                  </button>
-                </div>
-              </form>
-            </section>
-          </div>
-        )}
+                    {appearance.nextTracks.length ? (
+                      <ol>
+                        {appearance.nextTracks.map((track, i) => (
+                          <li key={i}>
+                            {track.title} — {track.artist}
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p>No following tracks.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="cf-muted">
+              Select a song to explore its appearances.
+            </p>
+          )}
+        </section>
+
+        <p className="cf-demo-note">
+          Demo mode: mixes and ratings are sample data. Database
+          persistence and mix editing will be connected next.
+        </p>
       </main>
     </div>
   );
 }
-
-export default App;
