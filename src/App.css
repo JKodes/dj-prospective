@@ -604,3 +604,96 @@ input:focus-visible {
 .cf-fire:disabled {
   cursor: default;
 }
+
+
+
+/* Ordered Tracklist Editor */
+
+.cf-edit-action {
+  padding: 12px;
+  border-bottom: 1px solid #354052;
+}
+
+.cf-editor {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.cf-editor h2 {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.cf-editor h3 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.cf-editor-panel {
+  background: #1d2430;
+  border: 1px solid #354052;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.cf-editor .form-label {
+  color: #d5dce6;
+}
+
+.cf-editor .form-control {
+  background: #121720;
+  color: #fff;
+  border: 1px solid #475267;
+}
+
+.cf-editor .form-control:focus {
+  background: #121720;
+  color: #fff;
+  border-color: #ff813b;
+  box-shadow: 0 0 0 2px rgba(255, 129, 59, 0.2);
+}
+
+.cf-editor .form-control::placeholder {
+  color: #8793a5;
+}
+
+.cf-editor-tracks {
+  display: grid;
+  gap: 8px;
+}
+
+.cf-editor-track {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 14px;
+  background: #252d3a;
+  border-radius: 8px;
+}
+
+.cf-editor-track .cf-track-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.cf-track-rating {
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.cf-editor-empty {
+  text-align: center;
+  padding: 45px 15px;
+  color: #9ca8b9;
+}
+
+.cf-editor-empty svg {
+  color: #ff813b;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 650px) {
+  .cf-editor-track {
+    flex-wrap: wrap;
+  }
+}
