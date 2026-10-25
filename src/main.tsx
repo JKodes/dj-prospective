@@ -5,8 +5,6 @@ import "bootstrap/dist/css/bootstrap.min.css"
 
 
 
-import "@fontsource/orbitron/400.css";
-import "@fontsource/chokokutai/400.css";
 
 
 import App from "./App";
