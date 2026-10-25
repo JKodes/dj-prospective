@@ -476,3 +476,131 @@ input:focus-visible {
     width: 170px;
   }
 }
+
+
+
+
+/* Create DJ Mix Feature */
+
+.cf-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  background: #ff813b;
+  color: #111;
+  border: none;
+  border-radius: 8px;
+  padding: 11px 18px;
+  font-weight: 700;
+}
+
+.cf-primary-btn:hover {
+  background: #ffa36d;
+  color: #111;
+}
+
+.cf-workspace-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #354052;
+}
+
+.cf-workspace-tabs button {
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #aab4c2;
+  padding: 12px 8px;
+  cursor: pointer;
+}
+
+.cf-workspace-tabs button.active {
+  border-bottom-color: #ff813b;
+  color: #ffad80;
+  font-weight: 700;
+}
+
+.cf-empty {
+  background: #1d2430;
+  border: 1px dashed #475267;
+  border-radius: 12px;
+  padding: 55px 24px;
+  text-align: center;
+  margin-bottom: 25px;
+  color: #aab4c2;
+}
+
+.cf-empty h2 {
+  color: #fff;
+  font-size: 20px;
+  margin-top: 12px;
+}
+
+.cf-no-tracks {
+  padding: 45px 15px;
+  text-align: center;
+  color: #929eaf;
+}
+
+.cf-no-tracks p {
+  margin: 12px 0 4px;
+}
+
+.cf-no-tracks small {
+  font-size: 12px;
+}
+
+.cf-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.cf-modal {
+  background: #1d2430;
+  border: 1px solid #475267;
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%;
+  max-width: 510px;
+  max-height: 90vh;
+  overflow-y: auto;
+  color: #fff;
+}
+
+.cf-modal h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.cf-modal .form-label {
+  color: #d5dce6;
+}
+
+.cf-modal .form-control {
+  background: #121720;
+  border: 1px solid #475267;
+  color: #fff;
+}
+
+.cf-modal .form-control:focus {
+  background: #121720;
+  color: #fff;
+  border-color: #ff813b;
+  box-shadow: 0 0 0 2px rgba(255, 129, 59, 0.2);
+}
+
+.cf-modal .form-control::placeholder {
+  color: #8995a7;
+}
+
+.cf-fire:disabled {
+  cursor: default;
+}
