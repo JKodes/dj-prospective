@@ -1,4 +1,3 @@
-import { removeMixTrack } from "../database/removeMixTrack";
 
 import {
   useCallback,
@@ -13,6 +12,9 @@ import {
   ListOrdered,
   Music2,
   Trash2,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 
 import {
@@ -21,6 +23,8 @@ import {
   type MixTrack,
 } from "../database/mixTracks";
 
+import { removeMixTrack } from "../database/removeMixTrack";
+import { editMixTrack } from "../database/editMixTrack";
 
 type TracklistEditorProps = {
   mixId: string;
@@ -29,6 +33,52 @@ type TracklistEditorProps = {
   onBack: () => void;
 };
 
+type SongForm = {
+  title: string;
+  artist: string;
+  rating: number;
+};
+
+const emptyForm: SongForm = {
+  title: "",
+  artist: "",
+  rating: 3,
+};
+
+function FireRating({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className="cf-fires"
+      role="group"
+      aria-label="Personal fire rating"
+    >
+      {[1, 2, 3, 4, 5].map((fire) => (
+        <button
+          key={fire}
+          type="button"
+          className={fire <= value ? "cf-fire lit" : "cf-fire"}
+          onClick={() => onChange(fire)}
+          disabled={disabled}
+          aria-label={`${fire} out of 5 fires`}
+          aria-pressed={value === fire}
+        >
+          🔥
+        </button>
+      ))}
+
+      <span className="cf-muted ms-2">{value}/5</span>
+    </div>
+  );
+}
+
 export default function TracklistEditor({
   mixId,
   mixTitle,
@@ -36,22 +86,14 @@ export default function TracklistEditor({
   onBack,
 }: TracklistEditorProps) {
   const [tracks, setTracks] = useState<MixTrack[]>([]);
+  const [newSong, setNewSong] = useState<SongForm>(emptyForm);
 
-  const [title, setTitle] = useState("");
-  const [artist, setArtist] = useState("");
-  const [rating, setRating] = useState(3);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<SongForm>(emptyForm);
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [deletingTrackId, setDeletingTrackId] = useState<
-    string | null
-  >(null);
-
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  // -----------------------------------------
-  // Load ordered tracks from SQLite
-  // -----------------------------------------
 
   const loadTracks = useCallback(async () => {
     const result = await getMixTracks(mixId);
@@ -63,12 +105,11 @@ export default function TracklistEditor({
 
     setLoading(true);
     setError("");
+    setEditingId(null);
 
     getMixTracks(mixId)
       .then((result) => {
-        if (active) {
-          setTracks(result);
-        }
+        if (active) setTracks(result);
       })
       .catch((err) => {
         if (active) {
@@ -78,9 +119,7 @@ export default function TracklistEditor({
         }
       })
       .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       });
 
     return () => {
@@ -88,213 +127,241 @@ export default function TracklistEditor({
     };
   }, [mixId]);
 
+  function errorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
+  }
+
   // -----------------------------------------
-  // Add a song to the selected DJ mix
+  // Add a song
   // -----------------------------------------
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (saving || !title.trim()) return;
+    if (busy || editingId || !newSong.title.trim()) return;
 
-    setSaving(true);
+    setBusy(true);
     setError("");
 
     try {
-      await addMixTrack(mixId, {
-        title: title.trim(),
-        artist: artist.trim(),
-        rating,
-      });
-
+      await addMixTrack(mixId, newSong);
       await loadTracks();
-
-      setTitle("");
-      setArtist("");
-      setRating(3);
+      setNewSong({ ...emptyForm });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : String(err)
-      );
+      setError(errorMessage(err));
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
 
   // -----------------------------------------
-  // Remove one track occurrence from a mix
+  // Begin editing a song
   // -----------------------------------------
 
-  async function handleRemoveTrack(track: MixTrack) {
-    if (saving || deletingTrackId !== null) return;
+  function startEditing(track: MixTrack) {
+    if (busy) return;
+
+    setEditingId(track.id);
+
+    setEditForm({
+      title: track.title,
+      artist: track.artist,
+      rating: track.rating,
+    });
+
+    setError("");
+  }
+
+  function cancelEditing() {
+    if (busy) return;
+
+    setEditingId(null);
+    setEditForm({ ...emptyForm });
+  }
+
+  // -----------------------------------------
+  // Save changes to a song
+  // -----------------------------------------
+
+  async function handleSaveEdit(
+    event: FormEvent<HTMLFormElement>,
+    track: MixTrack
+  ) {
+    event.preventDefault();
+
+    if (
+      busy ||
+      editingId !== track.id ||
+      !editForm.title.trim()
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+
+    try {
+      await editMixTrack(mixId, track.id, editForm);
+      await loadTracks();
+
+      setEditingId(null);
+      setEditForm({ ...emptyForm });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // -----------------------------------------
+  // Remove a track from this mix
+  // -----------------------------------------
+
+  async function handleRemove(track: MixTrack) {
+    if (busy || editingId) return;
 
     const confirmed = window.confirm(
       `Remove "${track.title}" from "${mixTitle}"?\n\n` +
-        "This will not delete the song from other DJ mixes."
+        "This will not delete the song from other mixes."
     );
 
     if (!confirmed) return;
 
-    setDeletingTrackId(track.id);
+    setBusy(true);
     setError("");
 
     try {
       await removeMixTrack(mixId, track.id);
-
-      // Refresh the tracklist after the deletion.
       await loadTracks();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : String(err)
-      );
+      setError(errorMessage(err));
     } finally {
-      setDeletingTrackId(null);
+      setBusy(false);
     }
   }
 
-  const isBusy = saving || deletingTrackId !== null;
-
   // -----------------------------------------
-  // Render Tracklist Editor
+  // Render
   // -----------------------------------------
 
   return (
     <section className="cf-editor">
-      {/* Back navigation */}
       <button
         type="button"
         className="btn btn-outline-light mb-4"
         onClick={onBack}
-        disabled={isBusy}
+        disabled={busy}
       >
         <ArrowLeft size={16} className="me-2" />
         BACK TO MIXES
       </button>
 
-      {/* Mix information */}
       <header className="mb-4">
         <h2>{mixTitle}</h2>
         <p className="cf-muted">{djName}</p>
       </header>
 
-      {/* Database errors */}
       {error && (
         <div className="alert alert-danger" role="alert">
           {error}
         </div>
       )}
 
-      {/* Add Song form */}
+      {/* Add new song */}
       <div className="cf-editor-panel mb-4">
         <h3>Add Song</h3>
 
         <p className="cf-muted">
-          Enter each song in the order the DJ played it.
+          Document songs in the order the DJ played them.
         </p>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleAdd}>
           <div className="row g-3">
             <div className="col-md-6">
               <label
-                htmlFor="track-title"
+                htmlFor="new-track-title"
                 className="form-label"
               >
                 Song Title
               </label>
 
               <input
-                id="track-title"
+                id="new-track-title"
                 className="form-control"
-                value={title}
+                value={newSong.title}
                 onChange={(event) =>
-                  setTitle(event.target.value)
+                  setNewSong((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
                 }
                 placeholder="Enter song title"
-                disabled={isBusy}
+                disabled={busy || editingId !== null}
                 required
               />
             </div>
 
             <div className="col-md-6">
               <label
-                htmlFor="track-artist"
+                htmlFor="new-track-artist"
                 className="form-label"
               >
                 Artist
               </label>
 
               <input
-                id="track-artist"
+                id="new-track-artist"
                 className="form-control"
-                value={artist}
+                value={newSong.artist}
                 onChange={(event) =>
-                  setArtist(event.target.value)
+                  setNewSong((current) => ({
+                    ...current,
+                    artist: event.target.value,
+                  }))
                 }
                 placeholder="Enter artist"
-                disabled={isBusy}
+                disabled={busy || editingId !== null}
               />
             </div>
           </div>
 
-          {/* Fire rating */}
           <div className="mt-3">
             <label className="form-label">
               Personal Fire Rating
             </label>
 
-            <div
-              className="cf-fires"
-              role="group"
-              aria-label="Fire rating for new song"
-            >
-              {[1, 2, 3, 4, 5].map((value) => (
-                <button
-                  type="button"
-                  key={value}
-                  className={
-                    value <= rating
-                      ? "cf-fire lit"
-                      : "cf-fire"
-                  }
-                  onClick={() => setRating(value)}
-                  disabled={isBusy}
-                  aria-label={`Rate ${value} fires`}
-                  aria-pressed={rating === value}
-                >
-                  🔥
-                </button>
-              ))}
-
-              <span className="cf-muted ms-3">
-                {rating}/5
-              </span>
-            </div>
+            <FireRating
+              value={newSong.rating}
+              onChange={(rating) =>
+                setNewSong((current) => ({
+                  ...current,
+                  rating,
+                }))
+              }
+              disabled={busy || editingId !== null}
+            />
           </div>
 
-          {/* Save song */}
           <button
             type="submit"
             className="btn cf-primary-btn mt-4"
-            disabled={isBusy || !title.trim()}
+            disabled={
+              busy ||
+              editingId !== null ||
+              !newSong.title.trim()
+            }
           >
             <Plus size={17} />
-            {saving ? "SAVING..." : "ADD SONG"}
+            {busy ? "WORKING..." : "ADD SONG"}
           </button>
         </form>
       </div>
 
-      {/* Ordered tracklist */}
+      {/* Existing tracks */}
       <div className="cf-editor-panel">
         <div className="d-flex align-items-center gap-2 mb-3">
-          <ListOrdered
-            size={20}
-            className="cf-accent"
-          />
-
+          <ListOrdered size={20} className="cf-accent" />
           <h3 className="mb-0">Original Tracklist</h3>
-
           <span className="cf-muted ms-auto">
             {tracks.length} tracks
           </span>
@@ -309,45 +376,147 @@ export default function TracklistEditor({
           </div>
         ) : (
           <div className="cf-editor-tracks">
-            {tracks.map((track) => (
-              <div
-                key={track.id}
-                className="cf-editor-track"
-              >
-                {/* Original playback position */}
-                <span className="cf-track-number">
-                  {String(track.position).padStart(2, "0")}
-                </span>
+            {tracks.map((track) =>
+              editingId === track.id ? (
+                <form
+                  key={track.id}
+                  className="cf-editor-track"
+                  onSubmit={(event) =>
+                    handleSaveEdit(event, track)
+                  }
+                >
+                  <span className="cf-track-number">
+                    {String(track.position).padStart(2, "0")}
+                  </span>
 
-                {/* Song details */}
-                <div className="cf-track-info">
-                  <strong>{track.title}</strong>
-                  <small>
-                    {track.artist || "Unknown artist"}
-                  </small>
+                  <div className="flex-grow-1">
+                    <div className="row g-2">
+                      <div className="col-md-6">
+                        <label
+                          className="form-label"
+                          htmlFor={`title-${track.id}`}
+                        >
+                          Song Title
+                        </label>
+                        <input
+                          id={`title-${track.id}`}
+                          className="form-control"
+                          value={editForm.title}
+                          onChange={(event) =>
+                            setEditForm((current) => ({
+                              ...current,
+                              title: event.target.value,
+                            }))
+                          }
+                          disabled={busy}
+                          required
+                        />
+                      </div>
+
+                      <div className="col-md-6">
+                        <label
+                          className="form-label"
+                          htmlFor={`artist-${track.id}`}
+                        >
+                          Artist
+                        </label>
+                        <input
+                          id={`artist-${track.id}`}
+                          className="form-control"
+                          value={editForm.artist}
+                          onChange={(event) =>
+                            setEditForm((current) => ({
+                              ...current,
+                              artist: event.target.value,
+                            }))
+                          }
+                          disabled={busy}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3">
+                      <FireRating
+                        value={editForm.rating}
+                        onChange={(rating) =>
+                          setEditForm((current) => ({
+                            ...current,
+                            rating,
+                          }))
+                        }
+                        disabled={busy}
+                      />
+                    </div>
+
+                    <div className="d-flex gap-2 mt-3">
+                      <button
+                        type="submit"
+                        className="btn cf-primary-btn"
+                        disabled={busy || !editForm.title.trim()}
+                      >
+                        <Check size={16} />
+                        SAVE CHANGES
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-outline-light"
+                        onClick={cancelEditing}
+                        disabled={busy}
+                      >
+                        <X size={16} className="me-1" />
+                        CANCEL
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <div
+                  key={track.id}
+                  className="cf-editor-track"
+                >
+                  <span className="cf-track-number">
+                    {String(track.position).padStart(2, "0")}
+                  </span>
+
+                  <div className="cf-track-info">
+                    <strong>{track.title}</strong>
+                    <small>
+                      {track.artist || "Unknown artist"}
+                    </small>
+                  </div>
+
+                  <span
+                    className="cf-track-rating"
+                    aria-label={`${track.rating} out of 5 fires`}
+                  >
+                    {"🔥".repeat(track.rating)}
+                  </span>
+
+                  <button
+                    type="button"
+                    className="btn btn-outline-light btn-sm"
+                    onClick={() => startEditing(track)}
+                    disabled={busy || editingId !== null}
+                    aria-label={`Edit ${track.title}`}
+                    title="Edit song"
+                  >
+                    <Pencil size={17} />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-outline-danger btn-sm"
+                    onClick={() => handleRemove(track)}
+                    disabled={busy || editingId !== null}
+                    aria-label={`Remove ${track.title} from mix`}
+                    title="Remove song"
+                  >
+                    <Trash2 size={17} />
+                  </button>
                 </div>
-
-                {/* Fire rating */}
-                <span
-                  className="cf-track-rating"
-                  aria-label={`${track.rating} out of 5 fires`}
-                >
-                  {"🔥".repeat(track.rating)}
-                </span>
-
-                {/* Delete one track from this mix */}
-                <button
-                  type="button"
-                  className="btn btn-outline-danger btn-sm"
-                  onClick={() => handleRemoveTrack(track)}
-                  disabled={isBusy}
-                  aria-label={`Remove ${track.title} from mix`}
-                  title="Remove from mix"
-                >
-                  <Trash2 size={17} />
-                </button>
-              </div>
-            ))}
+              )
+            )}
           </div>
         )}
       </div>
