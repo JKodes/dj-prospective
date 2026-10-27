@@ -116,3 +116,29 @@ export async function addMixTrack(
     ]
   );
 }
+
+
+export async function removeMixTrack(
+  mixId: string,
+  trackId: string
+): Promise<void> {
+  if (!mixId.trim() || !trackId.trim()) {
+    throw new Error("Mix ID and track ID are required.");
+  }
+
+  const db = await getDatabase();
+
+  // Delete only this occurrence of the song.
+  const result = await db.execute(
+    `DELETE FROM mix_tracks
+     WHERE id = $1 AND mix_id = $2`,
+    [trackId, mixId]
+  );
+
+  if (result.rowsAffected !== 1) {
+    throw new Error("Track not found in this mix.");
+  }
+
+  // Temporarily retain gaps in position numbers.
+  // Future reordering will normalize them safely.
+}
