@@ -1,10 +1,4 @@
-
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type FormEvent,
-} from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import {
   ArrowLeft,
@@ -15,6 +9,8 @@ import {
   Pencil,
   Check,
   X,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 import {
@@ -25,6 +21,11 @@ import {
 
 import { removeMixTrack } from "../database/removeMixTrack";
 import { editMixTrack } from "../database/editMixTrack";
+
+import {
+  reorderMixTrack,
+  type MoveDirection,
+} from "../database/reorderMixTrack";
 
 type TracklistEditorProps = {
   mixId: string;
@@ -55,11 +56,7 @@ function FireRating({
   disabled?: boolean;
 }) {
   return (
-    <div
-      className="cf-fires"
-      role="group"
-      aria-label="Personal fire rating"
-    >
+    <div className="cf-fires" role="group" aria-label="Personal fire rating">
       {[1, 2, 3, 4, 5].map((fire) => (
         <button
           key={fire}
@@ -113,9 +110,7 @@ export default function TracklistEditor({
       })
       .catch((err) => {
         if (active) {
-          setError(
-            err instanceof Error ? err.message : String(err)
-          );
+          setError(err instanceof Error ? err.message : String(err));
         }
       })
       .finally(() => {
@@ -185,15 +180,11 @@ export default function TracklistEditor({
 
   async function handleSaveEdit(
     event: FormEvent<HTMLFormElement>,
-    track: MixTrack
+    track: MixTrack,
   ) {
     event.preventDefault();
 
-    if (
-      busy ||
-      editingId !== track.id ||
-      !editForm.title.trim()
-    ) {
+    if (busy || editingId !== track.id || !editForm.title.trim()) {
       return;
     }
 
@@ -222,7 +213,7 @@ export default function TracklistEditor({
 
     const confirmed = window.confirm(
       `Remove "${track.title}" from "${mixTitle}"?\n\n` +
-        "This will not delete the song from other mixes."
+        "This will not delete the song from other mixes.",
     );
 
     if (!confirmed) return;
@@ -235,6 +226,29 @@ export default function TracklistEditor({
       await loadTracks();
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleMove(track: MixTrack, direction: MoveDirection) {
+    if (busy || editingId !== null) return;
+
+    setBusy(true);
+    setError("");
+
+    try {
+      await reorderMixTrack(mixId, track.id, direction);
+      await loadTracks();
+    } catch (err) {
+      setError(errorMessage(err));
+
+      // Refresh even on failure so the UI reflects SQLite.
+      try {
+        await loadTracks();
+      } catch {
+        // Keep the original error visible.
+      }
     } finally {
       setBusy(false);
     }
@@ -278,10 +292,7 @@ export default function TracklistEditor({
         <form onSubmit={handleAdd}>
           <div className="row g-3">
             <div className="col-md-6">
-              <label
-                htmlFor="new-track-title"
-                className="form-label"
-              >
+              <label htmlFor="new-track-title" className="form-label">
                 Song Title
               </label>
 
@@ -302,10 +313,7 @@ export default function TracklistEditor({
             </div>
 
             <div className="col-md-6">
-              <label
-                htmlFor="new-track-artist"
-                className="form-label"
-              >
+              <label htmlFor="new-track-artist" className="form-label">
                 Artist
               </label>
 
@@ -326,9 +334,7 @@ export default function TracklistEditor({
           </div>
 
           <div className="mt-3">
-            <label className="form-label">
-              Personal Fire Rating
-            </label>
+            <label className="form-label">Personal Fire Rating</label>
 
             <FireRating
               value={newSong.rating}
@@ -345,11 +351,7 @@ export default function TracklistEditor({
           <button
             type="submit"
             className="btn cf-primary-btn mt-4"
-            disabled={
-              busy ||
-              editingId !== null ||
-              !newSong.title.trim()
-            }
+            disabled={busy || editingId !== null || !newSong.title.trim()}
           >
             <Plus size={17} />
             {busy ? "WORKING..." : "ADD SONG"}
@@ -362,9 +364,7 @@ export default function TracklistEditor({
         <div className="d-flex align-items-center gap-2 mb-3">
           <ListOrdered size={20} className="cf-accent" />
           <h3 className="mb-0">Original Tracklist</h3>
-          <span className="cf-muted ms-auto">
-            {tracks.length} tracks
-          </span>
+          <span className="cf-muted ms-auto">{tracks.length} tracks</span>
         </div>
 
         {loading ? (
@@ -376,14 +376,12 @@ export default function TracklistEditor({
           </div>
         ) : (
           <div className="cf-editor-tracks">
-            {tracks.map((track) =>
+            {tracks.map((track, index) =>
               editingId === track.id ? (
                 <form
                   key={track.id}
                   className="cf-editor-track"
-                  onSubmit={(event) =>
-                    handleSaveEdit(event, track)
-                  }
+                  onSubmit={(event) => handleSaveEdit(event, track)}
                 >
                   <span className="cf-track-number">
                     {String(track.position).padStart(2, "0")}
@@ -471,19 +469,14 @@ export default function TracklistEditor({
                   </div>
                 </form>
               ) : (
-                <div
-                  key={track.id}
-                  className="cf-editor-track"
-                >
+                <div key={track.id} className="cf-editor-track">
                   <span className="cf-track-number">
                     {String(track.position).padStart(2, "0")}
                   </span>
 
                   <div className="cf-track-info">
                     <strong>{track.title}</strong>
-                    <small>
-                      {track.artist || "Unknown artist"}
-                    </small>
+                    <small>{track.artist || "Unknown artist"}</small>
                   </div>
 
                   <span
@@ -493,6 +486,54 @@ export default function TracklistEditor({
                     {"🔥".repeat(track.rating)}
                   </span>
 
+<div className="d-flex gap-1">
+                    <button
+                      type="button"
+                      className="btn btn-outline-light btn-sm"
+                      onClick={() =>
+                        void handleMove(track, "up")
+                      }
+                      disabled={
+                        busy ||
+                        editingId !== null ||
+                        index === 0
+                      }
+                      aria-label={`Move ${track.title} up`}
+                      title="Move up"
+                    >
+                      <ArrowUp size={16} />
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-outline-light btn-sm"
+                      onClick={() =>
+                        void handleMove(track, "down")
+                      }
+                      disabled={
+                        busy ||
+                        editingId !== null ||
+                        index === tracks.length - 1
+                      }
+                      aria-label={`Move ${track.title} down`}
+                      title="Move down"
+                    >
+                      <ArrowDown size={16} />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-outline-light btn-sm"
+                    onClick={() => startEditing(track)}
+                    disabled={busy || editingId !== null}
+                    aria-label={`Edit ${track.title}`}
+                    title="Edit song"
+                  >
+                    <Pencil size={17} />
+                  </button>
+
+                  {/* Delete button */}
                   <button
                     type="button"
                     className="btn btn-outline-light btn-sm"
@@ -515,7 +556,7 @@ export default function TracklistEditor({
                     <Trash2 size={17} />
                   </button>
                 </div>
-              )
+              ),
             )}
           </div>
         )}
@@ -523,4 +564,3 @@ export default function TracklistEditor({
     </section>
   );
 }
-
