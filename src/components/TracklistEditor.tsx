@@ -1,3 +1,5 @@
+import { removeMixTrack } from "../database/removeMixTrack";
+
 import {
   useCallback,
   useEffect,
@@ -10,6 +12,7 @@ import {
   Plus,
   ListOrdered,
   Music2,
+  Trash2,
 } from "lucide-react";
 
 import {
@@ -18,7 +21,8 @@ import {
   type MixTrack,
 } from "../database/mixTracks";
 
-type Props = {
+
+type TracklistEditorProps = {
   mixId: string;
   mixTitle: string;
   djName: string;
@@ -30,14 +34,24 @@ export default function TracklistEditor({
   mixTitle,
   djName,
   onBack,
-}: Props) {
+}: TracklistEditorProps) {
   const [tracks, setTracks] = useState<MixTrack[]>([]);
+
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [rating, setRating] = useState(3);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingTrackId, setDeletingTrackId] = useState<
+    string | null
+  >(null);
+
   const [error, setError] = useState("");
+
+  // -----------------------------------------
+  // Load ordered tracks from SQLite
+  // -----------------------------------------
 
   const loadTracks = useCallback(async () => {
     const result = await getMixTracks(mixId);
@@ -47,21 +61,36 @@ export default function TracklistEditor({
   useEffect(() => {
     let active = true;
 
+    setLoading(true);
+    setError("");
+
     getMixTracks(mixId)
       .then((result) => {
-        if (active) setTracks(result);
+        if (active) {
+          setTracks(result);
+        }
       })
       .catch((err) => {
-        if (active) setError(String(err));
+        if (active) {
+          setError(
+            err instanceof Error ? err.message : String(err)
+          );
+        }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       });
 
     return () => {
       active = false;
     };
   }, [mixId]);
+
+  // -----------------------------------------
+  // Add a song to the selected DJ mix
+  // -----------------------------------------
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
@@ -75,8 +104,8 @@ export default function TracklistEditor({
 
     try {
       await addMixTrack(mixId, {
-        title,
-        artist,
+        title: title.trim(),
+        artist: artist.trim(),
         rating,
       });
 
@@ -94,31 +123,76 @@ export default function TracklistEditor({
     }
   }
 
+  // -----------------------------------------
+  // Remove one track occurrence from a mix
+  // -----------------------------------------
+
+  async function handleRemoveTrack(track: MixTrack) {
+    if (saving || deletingTrackId !== null) return;
+
+    const confirmed = window.confirm(
+      `Remove "${track.title}" from "${mixTitle}"?\n\n` +
+        "This will not delete the song from other DJ mixes."
+    );
+
+    if (!confirmed) return;
+
+    setDeletingTrackId(track.id);
+    setError("");
+
+    try {
+      await removeMixTrack(mixId, track.id);
+
+      // Refresh the tracklist after the deletion.
+      await loadTracks();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : String(err)
+      );
+    } finally {
+      setDeletingTrackId(null);
+    }
+  }
+
+  const isBusy = saving || deletingTrackId !== null;
+
+  // -----------------------------------------
+  // Render Tracklist Editor
+  // -----------------------------------------
+
   return (
     <section className="cf-editor">
+      {/* Back navigation */}
       <button
         type="button"
         className="btn btn-outline-light mb-4"
         onClick={onBack}
-        disabled={saving}
+        disabled={isBusy}
       >
         <ArrowLeft size={16} className="me-2" />
         BACK TO MIXES
       </button>
 
+      {/* Mix information */}
       <header className="mb-4">
         <h2>{mixTitle}</h2>
         <p className="cf-muted">{djName}</p>
       </header>
 
+      {/* Database errors */}
       {error && (
         <div className="alert alert-danger" role="alert">
           {error}
         </div>
       )}
 
+      {/* Add Song form */}
       <div className="cf-editor-panel mb-4">
         <h3>Add Song</h3>
+
+        <p className="cf-muted">
+          Enter each song in the order the DJ played it.
+        </p>
 
         <form onSubmit={handleSubmit}>
           <div className="row g-3">
@@ -134,8 +208,11 @@ export default function TracklistEditor({
                 id="track-title"
                 className="form-control"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(event) =>
+                  setTitle(event.target.value)
+                }
                 placeholder="Enter song title"
+                disabled={isBusy}
                 required
               />
             </div>
@@ -152,12 +229,16 @@ export default function TracklistEditor({
                 id="track-artist"
                 className="form-control"
                 value={artist}
-                onChange={(e) => setArtist(e.target.value)}
+                onChange={(event) =>
+                  setArtist(event.target.value)
+                }
                 placeholder="Enter artist"
+                disabled={isBusy}
               />
             </div>
           </div>
 
+          {/* Fire rating */}
           <div className="mt-3">
             <label className="form-label">
               Personal Fire Rating
@@ -166,7 +247,7 @@ export default function TracklistEditor({
             <div
               className="cf-fires"
               role="group"
-              aria-label="Fire rating"
+              aria-label="Fire rating for new song"
             >
               {[1, 2, 3, 4, 5].map((value) => (
                 <button
@@ -178,22 +259,25 @@ export default function TracklistEditor({
                       : "cf-fire"
                   }
                   onClick={() => setRating(value)}
+                  disabled={isBusy}
                   aria-label={`Rate ${value} fires`}
                   aria-pressed={rating === value}
                 >
                   🔥
                 </button>
               ))}
+
               <span className="cf-muted ms-3">
                 {rating}/5
               </span>
             </div>
           </div>
 
+          {/* Save song */}
           <button
             type="submit"
             className="btn cf-primary-btn mt-4"
-            disabled={saving}
+            disabled={isBusy || !title.trim()}
           >
             <Plus size={17} />
             {saving ? "SAVING..." : "ADD SONG"}
@@ -201,10 +285,16 @@ export default function TracklistEditor({
         </form>
       </div>
 
+      {/* Ordered tracklist */}
       <div className="cf-editor-panel">
         <div className="d-flex align-items-center gap-2 mb-3">
-          <ListOrdered size={20} className="cf-accent" />
+          <ListOrdered
+            size={20}
+            className="cf-accent"
+          />
+
           <h3 className="mb-0">Original Tracklist</h3>
+
           <span className="cf-muted ms-auto">
             {tracks.length} tracks
           </span>
@@ -224,21 +314,38 @@ export default function TracklistEditor({
                 key={track.id}
                 className="cf-editor-track"
               >
+                {/* Original playback position */}
                 <span className="cf-track-number">
                   {String(track.position).padStart(2, "0")}
                 </span>
 
+                {/* Song details */}
                 <div className="cf-track-info">
                   <strong>{track.title}</strong>
-                  <small>{track.artist || "Unknown artist"}</small>
+                  <small>
+                    {track.artist || "Unknown artist"}
+                  </small>
                 </div>
 
+                {/* Fire rating */}
                 <span
                   className="cf-track-rating"
                   aria-label={`${track.rating} out of 5 fires`}
                 >
                   {"🔥".repeat(track.rating)}
                 </span>
+
+                {/* Delete one track from this mix */}
+                <button
+                  type="button"
+                  className="btn btn-outline-danger btn-sm"
+                  onClick={() => handleRemoveTrack(track)}
+                  disabled={isBusy}
+                  aria-label={`Remove ${track.title} from mix`}
+                  title="Remove from mix"
+                >
+                  <Trash2 size={17} />
+                </button>
               </div>
             ))}
           </div>
@@ -247,3 +354,4 @@ export default function TracklistEditor({
     </section>
   );
 }
+
