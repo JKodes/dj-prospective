@@ -186,6 +186,20 @@ export default function App() {
   const [showNewMix, setShowNewMix] = useState(false);
   const [editingMix, setEditingMix] = useState<Mix | null>(null);
 
+  const [selectedMixIds, setSelectedMixIds] = useState<string[]>([]);
+
+  function toggleMixSelection(mixId: string) {
+    setSelectedMixIds((current) =>
+      current.includes(mixId)
+        ? current.filter((id) => id !== mixId)
+        : [...current, mixId],
+    );
+  }
+
+  function clearMixSelection() {
+    setSelectedMixIds([]);
+  }
+
   // Edit Mix Title
   const [renamingMixId, setRenamingMixId] = useState<string | null>(null);
   const [mixTitleDraft, setMixTitleDraft] = useState("");
@@ -310,8 +324,6 @@ export default function App() {
   // Highlight Matching and Following Tracks
   // -----------------------------------------
 
- 
-
   // -----------------------------------------
   // Create New Mix
   // -----------------------------------------
@@ -358,6 +370,7 @@ export default function App() {
 
   function changeMode(next: WorkspaceMode) {
     setMode(next);
+    setSelectedMixIds([]);
     setSelectedSong(next === "demo" ? "c" : null);
     setHoveredSong(null);
     setSearch("");
@@ -614,6 +627,39 @@ export default function App() {
               </div>
             </section>
 
+            {/* Comparison Selection Toolbar */}
+            {mode === "saved" && savedMixes.length > 0 && (
+              <div className="d-flex align-items-center gap-3 mb-4 flex-wrap">
+                <span className="cf-muted">
+                  {selectedMixIds.length} mix(es) selected
+                </span>
+
+                <button
+                  type="button"
+                  className="btn cf-primary-btn"
+                  disabled={selectedMixIds.length < 2}
+                  onClick={() => {
+                    // The comparison screen is our next milestone.
+                    setSuccessMessage(
+                      `${selectedMixIds.length} mixes selected for comparison.`,
+                    );
+                  }}
+                >
+                  COMPARE SELECTED MIXES
+                </button>
+
+                {selectedMixIds.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-outline-light btn-sm"
+                    onClick={clearMixSelection}
+                  >
+                    CLEAR SELECTION
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Mix Cards */}
             {mode === "saved" && loading ? (
               <div className="cf-empty">Loading your DJ mixes...</div>
@@ -636,6 +682,26 @@ export default function App() {
               >
                 {mixes.map((mix) => (
                   <article className="cf-mix-card" key={mix.id}>
+                    {/* Mix comparison selection */}
+                    {mode === "saved" && (
+                      <div className="d-flex align-items-center gap-2 px-3 pt-3">
+                        <input
+                          type="checkbox"
+                          className="form-check-input m-0"
+                          id={`select-mix-${mix.id}`}
+                          checked={selectedMixIds.includes(mix.id)}
+                          onChange={() => toggleMixSelection(mix.id)}
+                        />
+
+                        <label
+                          htmlFor={`select-mix-${mix.id}`}
+                          className="cf-muted"
+                        >
+                          Select for comparison
+                        </label>
+                      </div>
+                    )}
+
                     {/* Mix Heading */}
                     <div className="cf-mix-heading">
                       <Disc3 size={25} className="cf-accent" />
