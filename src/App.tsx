@@ -5,7 +5,6 @@ import {
   Disc3,
   ListMusic,
   Search,
-  ArrowRight,
   Music2,
   Plus,
   Pencil,
@@ -139,6 +138,23 @@ const demoMixes: Mix[] = [
 // Convert SQLite Workspace Data
 // -----------------------------------------
 
+function getMixPreviewSongs(mix: Mix): Song[] {
+  // Only consider songs rated 4 or 5 fires.
+  const highlyRated = mix.tracks.filter((song) => song.rating >= 4);
+
+  // Shuffle the candidates using Fisher-Yates.
+  const shuffled = [...highlyRated];
+
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // Display no more than three.
+  return shuffled.slice(0, 3);
+}
+
 function convertMixes(rows: WorkspaceMix[]): Mix[] {
   return rows.map((mix) => ({
     id: mix.id,
@@ -184,6 +200,17 @@ export default function App() {
   const [demoRatings, setDemoRatings] = useState<Record<string, number>>({});
 
   const mixes = mode === "demo" ? demoMixes : savedMixes;
+
+  const previewSongs = useMemo(() => {
+    const previews = new Map<string, Song[]>();
+
+    for (const mix of mixes) {
+      previews.set(mix.id, getMixPreviewSongs(mix));
+    }
+
+    return previews;
+  }, [mixes]);
+
   const activeSong = hoveredSong ?? selectedSong;
 
   // -----------------------------------------
@@ -283,25 +310,7 @@ export default function App() {
   // Highlight Matching and Following Tracks
   // -----------------------------------------
 
-  function trackState(
-    mix: Mix,
-    index: number,
-  ): "selected" | "following" | "normal" {
-    if (!activeSong) return "normal";
-
-    if (mix.tracks[index].id === activeSong) {
-      return "selected";
-    }
-
-    const isFollowing = mix.tracks.some(
-      (track, selectedIndex) =>
-        track.id === activeSong &&
-        index > selectedIndex &&
-        index <= selectedIndex + 5,
-    );
-
-    return isFollowing ? "following" : "normal";
-  }
+ 
 
   // -----------------------------------------
   // Create New Mix
@@ -744,53 +753,44 @@ export default function App() {
                     )}
 
                     {/* Ordered Tracks */}
-                    {mix.tracks.length === 0 ? (
-                      <div className="cf-no-tracks">
-                        <Music2 size={25} />
-                        <p>No tracks added yet.</p>
-                        <small>Open Edit Tracklist to add songs.</small>
+
+                    {/* High-rated Song Preview */}
+                    <div className="cf-tracks">
+                      <div className="px-3 pt-3 pb-2">
+                        <strong>Top Song Discoveries</strong>
+                        <p className="cf-muted mb-0">
+                          Random selection of songs rated 4–5 🔥
+                        </p>
                       </div>
-                    ) : (
-                      <div className="cf-tracks">
-                        {mix.tracks.map((song, index) => {
-                          const state = trackState(mix, index);
 
-                          return (
-                            <button
-                              type="button"
-                              key={`${mix.id}-${index}`}
-                              className={`cf-track ${state}`}
-                              onMouseEnter={() => setHoveredSong(song.id)}
-                              onFocus={() => setHoveredSong(song.id)}
-                              onBlur={() => setHoveredSong(null)}
-                              onClick={() => setSelectedSong(song.id)}
-                              aria-pressed={state === "selected"}
-                            >
-                              <span className="cf-track-number">
-                                {String(index + 1).padStart(2, "0")}
-                              </span>
+                      {(previewSongs.get(mix.id) ?? []).length === 0 ? (
+                        <div className="cf-no-tracks">
+                          <Music2 size={25} />
+                          <p>No highly rated songs yet.</p>
+                          <small>Rate songs 4 or 5 🔥 to see them here.</small>
+                        </div>
+                      ) : (
+                        (previewSongs.get(mix.id) ?? []).map((song, index) => (
+                          <div
+                            key={`${mix.id}-${song.id}-${index}`}
+                            className="cf-track"
+                          >
+                            <span className="cf-track-number">
+                              {String(index + 1).padStart(2, "0")}
+                            </span>
 
-                              <span className="cf-track-info">
-                                <strong>{song.title}</strong>
+                            <span className="cf-track-info">
+                              <strong>{song.title}</strong>
+                              <small>{song.artist}</small>
+                            </span>
 
-                                <small>{song.artist}</small>
-                              </span>
-
-                              {state === "selected" && (
-                                <Flame size={16} className="cf-accent" />
-                              )}
-
-                              {state === "following" && (
-                                <ArrowRight
-                                  size={15}
-                                  className="cf-next-icon"
-                                />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                            <span aria-label={`${song.rating} out of 5 fires`}>
+                              {"🔥".repeat(song.rating)}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </article>
                 ))}
               </section>
