@@ -79,6 +79,7 @@ export type NewMixInput = {
   genre: string;
   source_url: string;
   notes: string;
+  rating: number;
 };
 
 export async function createResearchMix(input: NewMixInput): Promise<string> {

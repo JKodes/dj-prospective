@@ -1,4 +1,3 @@
-
 import { useState, type FormEvent } from "react";
 import { X, Disc3 } from "lucide-react";
 import type { NewMixInput } from "../database/mixWorkspace";
@@ -14,20 +13,16 @@ const initialForm: NewMixInput = {
   genre: "",
   source_url: "",
   notes: "",
+  rating: 0,
 };
 
-export default function NewMixForm({
-  onSave,
-  onClose,
-}: Props) {
+export default function NewMixForm({ onSave, onClose }: Props) {
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [mixRating, setMixRating] = useState(0);
 
-  function change(
-    field: keyof NewMixInput,
-    value: string
-  ) {
+  function change(field: keyof NewMixInput, value: string) {
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -40,11 +35,12 @@ export default function NewMixForm({
     setError("");
 
     try {
-      await onSave(form);
+      await onSave({
+        ...form,
+        rating: mixRating,
+      });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : String(err)
-      );
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -78,8 +74,8 @@ export default function NewMixForm({
         </div>
 
         <p className="cf-muted mb-4">
-          Save a DJ mix you want to study.
-          We'll add its ordered tracklist afterward.
+          Save a DJ mix you want to study. We'll add its ordered tracklist
+          afterward.
         </p>
 
         {error && (
@@ -158,6 +154,34 @@ export default function NewMixForm({
             >
               CANCEL
             </button>
+
+            {/* Overall DJ Mix Rating */}
+            <div className="mb-3">
+              <label className="form-label">Overall Mix Rating</label>
+
+              <div
+                className="d-flex align-items-center gap-2"
+                role="group"
+                aria-label="Overall DJ mix rating"
+              >
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className="btn btn-outline-light"
+                    onClick={() => setMixRating(value)}
+                    aria-label={`Rate mix ${value} out of 5`}
+                    aria-pressed={mixRating === value}
+                  >
+                    {value <= mixRating ? "👌" : "◯"}
+                  </button>
+                ))}
+
+                <span className="cf-muted ms-2">
+                  {mixRating === 0 ? "Not rated" : `${mixRating}/5`}
+                </span>
+              </div>
+            </div>
 
             <button
               type="submit"
