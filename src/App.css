@@ -697,3 +697,48 @@ input:focus-visible {
     flex-wrap: wrap;
   }
 }
+
+/* Edit DJ Mix Title */
+
+.cf-mix-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cf-mix-title-row h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.cf-rename-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.cf-rename-form input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #475267;
+  border-radius: 7px;
+  background: #121720;
+  color: #fff;
+  font: inherit;
+}
+
+.cf-rename-form input:focus {
+  outline: 2px solid #ff813b;
+  outline-offset: 2px;
+}
+
+.cf-rename-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
