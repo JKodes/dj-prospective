@@ -12,6 +12,7 @@ import {
 
 import NewMixForm from "./components/NewMixForm";
 import TracklistEditor from "./components/TracklistEditor";
+import MixComparison from "./components/MixComparison";
 
 import {
   createResearchMix,
@@ -187,6 +188,7 @@ export default function App() {
   const [editingMix, setEditingMix] = useState<Mix | null>(null);
 
   const [selectedMixIds, setSelectedMixIds] = useState<string[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
 
   function toggleMixSelection(mixId: string) {
     setSelectedMixIds((current) =>
@@ -518,8 +520,14 @@ export default function App() {
       </aside>
 
       {/* Main Workspace */}
+
       <main className="cf-main">
-        {editingMix ? (
+        {showComparison ? (
+          <MixComparison
+            mixes={savedMixes.filter((mix) => selectedMixIds.includes(mix.id))}
+            onBack={() => setShowComparison(false)}
+          />
+        ) : editingMix ? (
           <TracklistEditor
             mixId={editingMix.id}
             mixTitle={editingMix.title}
@@ -639,10 +647,9 @@ export default function App() {
                   className="btn cf-primary-btn"
                   disabled={selectedMixIds.length < 2}
                   onClick={() => {
-                    // The comparison screen is our next milestone.
-                    setSuccessMessage(
-                      `${selectedMixIds.length} mixes selected for comparison.`,
-                    );
+                    setHoveredSong(null);
+                    setSelectedSong(null);
+                    setShowComparison(true);
                   }}
                 >
                   COMPARE SELECTED MIXES
