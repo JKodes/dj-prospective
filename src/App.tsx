@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -9,6 +8,7 @@ import {
   ArrowRight,
   Music2,
   Plus,
+  Pencil,
 } from "lucide-react";
 
 import NewMixForm from "./components/NewMixForm";
@@ -20,6 +20,8 @@ import {
   type WorkspaceMix,
   type NewMixInput,
 } from "./database/mixWorkspace";
+
+import { updateMixTitle } from "./database/updateMixTitle";
 
 import "./App.css";
 
@@ -44,8 +46,16 @@ type Mix = {
 
 type WorkspaceMode = "saved" | "demo";
 
+type SongAppearance = {
+  mixId: string;
+  title: string;
+  dj: string;
+  position: number;
+  nextTracks: Song[];
+};
+
 // -----------------------------------------
-// Demo songs
+// Sample comparison data
 // -----------------------------------------
 
 const demoSongs: Record<string, Song> = {
@@ -65,10 +75,6 @@ const demoSongs: Record<string, Song> = {
   n: { id: "n", title: "Song N", artist: "Artist Fourteen", rating: 4 },
   o: { id: "o", title: "Song O", artist: "Artist Fifteen", rating: 3 },
 };
-
-// -----------------------------------------
-// Demo mixes
-// -----------------------------------------
 
 const demoMixes: Mix[] = [
   {
@@ -122,7 +128,7 @@ const demoMixes: Mix[] = [
 ];
 
 // -----------------------------------------
-// Convert SQLite data into workspace data
+// Convert SQLite workspace data
 // -----------------------------------------
 
 function convertMixes(rows: WorkspaceMix[]): Mix[] {
@@ -141,42 +147,43 @@ function convertMixes(rows: WorkspaceMix[]): Mix[] {
 }
 
 // -----------------------------------------
-// App
+// Main Application
 // -----------------------------------------
 
 export default function App() {
+  // Saved mixes and workspace mode
   const [savedMixes, setSavedMixes] = useState<Mix[]>([]);
-
   const [mode, setMode] = useState<WorkspaceMode>("saved");
 
+  // Loading and error states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // New Mix modal
   const [showNewMix, setShowNewMix] = useState(false);
 
-  // Current mix being edited
+  // Tracklist Editor
   const [editingMix, setEditingMix] = useState<Mix | null>(null);
 
-  // Song selection and comparison
+  // Edit Mix Title
+  const [renamingMixId, setRenamingMixId] = useState<string | null>(null);
+  const [mixTitleDraft, setMixTitleDraft] = useState("");
+  const [savingMixTitle, setSavingMixTitle] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // Song comparison and search
   const [selectedSong, setSelectedSong] = useState<string | null>(null);
   const [hoveredSong, setHoveredSong] = useState<string | null>(null);
-
-  // Search
   const [search, setSearch] = useState("");
 
-  // Ratings for sample songs only
+  // Demo ratings are temporary and not saved
   const [demoRatings, setDemoRatings] = useState<Record<string, number>>({});
 
-  // -----------------------------------------
-  // Active workspace
-  // -----------------------------------------
-
   const mixes = mode === "demo" ? demoMixes : savedMixes;
-
   const activeSong = hoveredSong ?? selectedSong;
 
   // -----------------------------------------
-  // Load saved DJ mixes from SQLite
+  // Load saved mixes on startup
   // -----------------------------------------
 
   useEffect(() => {
@@ -192,9 +199,7 @@ export default function App() {
         }
       } catch (err) {
         if (active) {
-          setError(
-            err instanceof Error ? err.message : String(err)
-          );
+          setError(err instanceof Error ? err.message : String(err));
         }
       } finally {
         if (active) {
@@ -211,7 +216,7 @@ export default function App() {
   }, []);
 
   // -----------------------------------------
-  // All unique songs in the current workspace
+  // Unique songs in the current workspace
   // -----------------------------------------
 
   const allSongs = useMemo(() => {
@@ -219,22 +224,22 @@ export default function App() {
 
     for (const mix of mixes) {
       for (const song of mix.tracks) {
-        unique.set(song.id, song);
+        if (!unique.has(song.id)) {
+          unique.set(song.id, song);
+        }
       }
     }
 
     return [...unique.values()];
   }, [mixes]);
 
-  const currentSong = allSongs.find(
-    (song) => song.id === activeSong
-  );
+  const currentSong = allSongs.find((song) => song.id === activeSong);
 
   // -----------------------------------------
-  // Find every appearance of selected song
+  // Song appearances across all DJ mixes
   // -----------------------------------------
 
-  const appearances = useMemo(() => {
+  const appearances = useMemo<SongAppearance[]>(() => {
     if (!activeSong) return [];
 
     return mixes.flatMap((mix) =>
@@ -249,18 +254,18 @@ export default function App() {
                 nextTracks: mix.tracks.slice(index + 1, index + 6),
               },
             ]
-          : []
-      )
+          : [],
+      ),
     );
   }, [mixes, activeSong]);
 
   // -----------------------------------------
-  // Determine song highlighting
+  // Highlight selected and following tracks
   // -----------------------------------------
 
   function trackState(
     mix: Mix,
-    index: number
+    index: number,
   ): "selected" | "following" | "normal" {
     if (!activeSong) return "normal";
 
@@ -268,28 +273,27 @@ export default function App() {
       return "selected";
     }
 
-    const follows = mix.tracks.some(
+    const isFollowing = mix.tracks.some(
       (track, selectedIndex) =>
         track.id === activeSong &&
         index > selectedIndex &&
-        index <= selectedIndex + 5
+        index <= selectedIndex + 5,
     );
 
-    return follows ? "following" : "normal";
+    return isFollowing ? "following" : "normal";
   }
 
   // -----------------------------------------
-  // Create a DJ mix
+  // Create a new DJ mix
   // -----------------------------------------
 
   async function handleCreateMix(input: NewMixInput) {
     await createResearchMix(input);
 
     const updated = await loadMixWorkspace();
-
     setSavedMixes(convertMixes(updated));
-    setMode("saved");
 
+    setMode("saved");
     setSelectedSong(null);
     setHoveredSong(null);
     setSearch("");
@@ -298,13 +302,12 @@ export default function App() {
   }
 
   // -----------------------------------------
-  // Close tracklist editor and reload songs
+  // Close Tracklist Editor
   // -----------------------------------------
 
   async function closeTracklistEditor() {
     try {
       const updated = await loadMixWorkspace();
-
       setSavedMixes(convertMixes(updated));
 
       setEditingMix(null);
@@ -313,14 +316,12 @@ export default function App() {
       setSearch("");
       setError("");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : String(err)
-      );
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
   // -----------------------------------------
-  // Switch saved/demo workspace
+  // Switch between Saved and Demo
   // -----------------------------------------
 
   function changeMode(next: WorkspaceMode) {
@@ -328,40 +329,112 @@ export default function App() {
     setSelectedSong(next === "demo" ? "c" : null);
     setHoveredSong(null);
     setSearch("");
+
+    // Close any unfinished title editing session.
+    setRenamingMixId(null);
+    setMixTitleDraft("");
   }
 
   // -----------------------------------------
-  // Search for a song
+  // Search songs
   // -----------------------------------------
 
   function changeSearch(value: string) {
     setSearch(value);
+    setHoveredSong(null);
 
     if (!value.trim()) {
       setSelectedSong(null);
       return;
     }
 
+    const query = value.trim().toLowerCase();
+
     const match = allSongs.find(
       (song) =>
-        song.title
-          .toLowerCase()
-          .includes(value.toLowerCase()) ||
-        song.artist
-          .toLowerCase()
-          .includes(value.toLowerCase())
+        song.title.toLowerCase().includes(query) ||
+        song.artist.toLowerCase().includes(query),
     );
 
     setSelectedSong(match?.id ?? null);
   }
 
   // -----------------------------------------
-  // Current song rating
+  // Edit DJ Mix Title
+  // -----------------------------------------
+
+  function startRenamingMix(mix: Mix) {
+    if (savingMixTitle) return;
+
+    setRenamingMixId(mix.id);
+    setMixTitleDraft(mix.title);
+    setError("");
+  }
+
+  function cancelRenamingMix() {
+    if (savingMixTitle) return;
+
+    setRenamingMixId(null);
+    setMixTitleDraft("");
+  }
+
+  async function saveMixTitle(mix: Mix) {
+    if (savingMixTitle || renamingMixId !== mix.id) return;
+
+    const title = mixTitleDraft.trim();
+
+    if (!title) {
+      setError("Mix title cannot be empty.");
+      setSuccessMessage("");
+      return;
+    }
+
+    if (title === mix.title) {
+      cancelRenamingMix();
+      return;
+    }
+
+    setSavingMixTitle(true);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      // Save the new title in SQLite.
+      await updateMixTitle(mix.id, title);
+
+      // Update the displayed mix immediately.
+      setSavedMixes((current) =>
+        current.map((item) => (item.id === mix.id ? { ...item, title } : item)),
+      );
+
+      setRenamingMixId(null);
+      setMixTitleDraft("");
+
+      // Show confirmation only after SQLite succeeds.
+      setSuccessMessage(`Mix title successfully changed to "${title}".`);
+
+      // Reload in the background of the current interaction.
+      // If reload fails, keep the confirmed saved title.
+      try {
+        const updated = await loadMixWorkspace();
+        setSavedMixes(convertMixes(updated));
+      } catch {
+        setError("Title saved, but the mix list could not be refreshed.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingMixTitle(false);
+    }
+  }
+
+  // -----------------------------------------
+  // Current fire rating
   // -----------------------------------------
 
   const currentRating = currentSong
     ? mode === "demo"
-      ? demoRatings[currentSong.id] ?? currentSong.rating
+      ? (demoRatings[currentSong.id] ?? currentSong.rating)
       : currentSong.rating
     : 0;
 
@@ -378,41 +451,26 @@ export default function App() {
           <span>CrateFire</span>
         </div>
 
-        <p className="cf-nav-heading">
-          WORKSPACE
-        </p>
+        <p className="cf-nav-heading">WORKSPACE</p>
 
         <nav className="cf-nav">
-          <button
-            type="button"
-            className="cf-nav-link active"
-          >
+          <button type="button" className="cf-nav-link active">
             <Disc3 size={19} />
             DJ Mixes
           </button>
 
-          <button
-            type="button"
-            className="cf-nav-link"
-            disabled
-          >
+          <button type="button" className="cf-nav-link" disabled>
             <Search size={19} />
             Song Discovery
           </button>
 
-          <button
-            type="button"
-            className="cf-nav-link"
-            disabled
-          >
+          <button type="button" className="cf-nav-link" disabled>
             <ListMusic size={19} />
             My Crates
           </button>
         </nav>
 
-        <div className="cf-sidebar-bottom">
-          Personal DJ Research Workspace
-        </div>
+        <div className="cf-sidebar-bottom">Personal DJ Research Workspace</div>
       </aside>
 
       {/* Main Workspace */}
@@ -428,12 +486,10 @@ export default function App() {
           />
         ) : (
           <>
-            {/* Workspace Header */}
+            {/* Header */}
             <header className="cf-header">
               <div>
-                <p className="cf-eyebrow">
-                  MIX RESEARCH WORKSPACE
-                </p>
+                <p className="cf-eyebrow">MIX RESEARCH WORKSPACE</p>
 
                 <h1>DJ Mix Comparison</h1>
 
@@ -452,33 +508,41 @@ export default function App() {
               </button>
             </header>
 
-            {error && (
+            {/* Good Title Change*/}
+            {successMessage && (
               <div
-                className="alert alert-danger"
-                role="alert"
+                className="alert alert-success d-flex align-items-center justify-content-between"
+                role="status"
               >
-                Database error: {error}
+                <span>
+                  <strong>Success!</strong> {successMessage}
+                </span>
+
+                <button
+                  type="button"
+                  className="btn-close"
+                  aria-label="Dismiss success message"
+                  onClick={() => setSuccessMessage("")}
+                />
               </div>
             )}
 
-            {/* Saved / Demo Tabs */}
+            {/* Workspace Tabs */}
             <div className="cf-workspace-tabs">
               <button
                 type="button"
-                className={
-                  mode === "saved" ? "active" : ""
-                }
+                className={mode === "saved" ? "active" : ""}
                 onClick={() => changeMode("saved")}
+                disabled={savingMixTitle}
               >
                 MY SAVED MIXES ({savedMixes.length})
               </button>
 
               <button
                 type="button"
-                className={
-                  mode === "demo" ? "active" : ""
-                }
+                className={mode === "demo" ? "active" : ""}
                 onClick={() => changeMode("demo")}
+                disabled={savingMixTitle}
               >
                 SAMPLE COMPARISON
               </button>
@@ -492,9 +556,7 @@ export default function App() {
                 <input
                   type="search"
                   value={search}
-                  onChange={(event) =>
-                    changeSearch(event.target.value)
-                  }
+                  onChange={(event) => changeSearch(event.target.value)}
                   placeholder="Search a song or artist..."
                   aria-label="Search songs"
                 />
@@ -513,48 +575,98 @@ export default function App() {
               </div>
             </section>
 
-            {/* Mix Cards */}
+            {/* Saved / Demo Mix Cards */}
             {mode === "saved" && loading ? (
-              <div className="cf-empty">
-                Loading your DJ mixes...
-              </div>
+              <div className="cf-empty">Loading your DJ mixes...</div>
             ) : mixes.length === 0 ? (
               <div className="cf-empty">
-                <Disc3
-                  size={40}
-                  className="cf-accent"
-                />
+                <Disc3 size={40} className="cf-accent" />
 
                 <h2>No mixes saved yet</h2>
 
-                <p>
-                  Click NEW MIX to start documenting a DJ's set.
-                </p>
+                <p>Click NEW MIX to start documenting a DJ's set.</p>
 
                 <p>
-                  Or open SAMPLE COMPARISON to test
-                  the discovery feature.
+                  Or open SAMPLE COMPARISON to explore the discovery feature.
                 </p>
               </div>
             ) : (
               <section
                 className="cf-mix-grid"
-                onMouseLeave={() =>
-                  setHoveredSong(null)
-                }
+                onMouseLeave={() => setHoveredSong(null)}
               >
                 {mixes.map((mix) => (
-                  <article
-                    className="cf-mix-card"
-                    key={mix.id}
-                  >
+                  <article className="cf-mix-card" key={mix.id}>
+                    {/* Mix Heading and Title Editing */}
                     <div className="cf-mix-heading">
-                      <Disc3
-                        size={25}
-                        className="cf-accent"
-                      />
+                      <Disc3 size={25} className="cf-accent" />
 
-                      <h2>{mix.title}</h2>
+                      {mode === "saved" && renamingMixId === mix.id ? (
+                        <form
+                          className="cf-rename-form"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void saveMixTitle(mix);
+                          }}
+                        >
+                          <label
+                            htmlFor={`mix-title-${mix.id}`}
+                            className="cf-muted"
+                          >
+                            Mix Title
+                          </label>
+
+                          <input
+                            id={`mix-title-${mix.id}`}
+                            type="text"
+                            value={mixTitleDraft}
+                            onChange={(event) =>
+                              setMixTitleDraft(event.target.value)
+                            }
+                            maxLength={150}
+                            disabled={savingMixTitle}
+                            required
+                            autoFocus
+                          />
+
+                          <div className="cf-rename-actions">
+                            <button
+                              type="submit"
+                              className="btn cf-primary-btn btn-sm"
+                              disabled={savingMixTitle || !mixTitleDraft.trim()}
+                            >
+                              {savingMixTitle ? "SAVING..." : "SAVE"}
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-outline-light btn-sm"
+                              onClick={cancelRenamingMix}
+                              disabled={savingMixTitle}
+                            >
+                              CANCEL
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="cf-mix-title-row">
+                          <h2>{mix.title}</h2>
+
+                          {mode === "saved" && (
+                            <button
+                              type="button"
+                              className="btn btn-outline-light btn-sm"
+                              onClick={() => startRenamingMix(mix)}
+                              disabled={savingMixTitle}
+                              aria-label={`Edit title of ${mix.title}`}
+                              title="Edit mix title"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+
                       <p>{mix.dj}</p>
 
                       <span className="cf-genre">
@@ -562,78 +674,55 @@ export default function App() {
                       </span>
                     </div>
 
-                    {/* Edit saved mix tracklist */}
+                    {/* Edit Saved Tracklist */}
                     {mode === "saved" && (
                       <div className="cf-edit-action">
                         <button
                           type="button"
                           className="btn cf-primary-btn w-100"
-                          onClick={() =>
-                            setEditingMix(mix)
-                          }
+                          disabled={savingMixTitle}
+                          onClick={() => setEditingMix(mix)}
                         >
                           EDIT TRACKLIST
                         </button>
                       </div>
                     )}
 
-                    {/* Tracklist */}
+                    {/* Ordered Tracks */}
                     {mix.tracks.length === 0 ? (
                       <div className="cf-no-tracks">
                         <Music2 size={25} />
                         <p>No tracks added yet.</p>
-                        <small>
-                          Open Edit Tracklist to add songs.
-                        </small>
+                        <small>Open Edit Tracklist to add songs.</small>
                       </div>
                     ) : (
                       <div className="cf-tracks">
                         {mix.tracks.map((song, index) => {
-                          const state = trackState(
-                            mix,
-                            index
-                          );
+                          const state = trackState(mix, index);
 
                           return (
                             <button
                               type="button"
                               key={`${mix.id}-${index}`}
                               className={`cf-track ${state}`}
-                              onMouseEnter={() =>
-                                setHoveredSong(song.id)
-                              }
-                              onFocus={() =>
-                                setHoveredSong(song.id)
-                              }
-                              onBlur={() =>
-                                setHoveredSong(null)
-                              }
-                              onClick={() =>
-                                setSelectedSong(song.id)
-                              }
-                              aria-pressed={
-                                state === "selected"
-                              }
+                              onMouseEnter={() => setHoveredSong(song.id)}
+                              onFocus={() => setHoveredSong(song.id)}
+                              onBlur={() => setHoveredSong(null)}
+                              onClick={() => setSelectedSong(song.id)}
+                              aria-pressed={state === "selected"}
                             >
                               <span className="cf-track-number">
                                 {String(index + 1).padStart(2, "0")}
                               </span>
 
                               <span className="cf-track-info">
-                                <strong>
-                                  {song.title}
-                                </strong>
+                                <strong>{song.title}</strong>
 
-                                <small>
-                                  {song.artist}
-                                </small>
+                                <small>{song.artist}</small>
                               </span>
 
                               {state === "selected" && (
-                                <Flame
-                                  size={16}
-                                  className="cf-accent"
-                                />
+                                <Flame size={16} className="cf-accent" />
                               )}
 
                               {state === "following" && (
@@ -655,16 +744,11 @@ export default function App() {
             {/* Song Reference Panel */}
             <section className="cf-inspector">
               <div className="cf-inspector-heading">
-                <Music2
-                  size={22}
-                  className="cf-accent"
-                />
+                <Music2 size={22} className="cf-accent" />
 
                 <div>
                   <h2>Song Reference</h2>
-                  <p>
-                    Compare song appearances across mixes.
-                  </p>
+                  <p>Compare song appearances across mixes.</p>
                 </div>
               </div>
 
@@ -680,56 +764,39 @@ export default function App() {
                       <span>YOUR FIRE RATING</span>
 
                       <div className="cf-fires">
-                        {[1, 2, 3, 4, 5].map(
-                          (value) => (
-                            <button
-                              type="button"
-                              key={value}
-                              className={
-                                value <= currentRating
-                                  ? "cf-fire lit"
-                                  : "cf-fire"
-                              }
-                              disabled={mode === "saved"}
-                              onClick={() =>
-                                setDemoRatings(
-                                  (current) => ({
-                                    ...current,
-                                    [currentSong.id]:
-                                      value,
-                                  })
-                                )
-                              }
-                              aria-label={`Rate ${value} fires`}
-                              aria-pressed={
-                                currentRating === value
-                              }
-                            >
-                              🔥
-                            </button>
-                          )
-                        )}
+                        {[1, 2, 3, 4, 5].map((value) => (
+                          <button
+                            type="button"
+                            key={value}
+                            className={
+                              value <= currentRating ? "cf-fire lit" : "cf-fire"
+                            }
+                            disabled={mode === "saved"}
+                            onClick={() =>
+                              setDemoRatings((current) => ({
+                                ...current,
+                                [currentSong.id]: value,
+                              }))
+                            }
+                            aria-label={`Rate ${value} fires`}
+                            aria-pressed={currentRating === value}
+                          >
+                            🔥
+                          </button>
+                        ))}
                       </div>
 
                       {mode === "saved" && (
                         <small className="cf-muted">
-                          Ratings are assigned when
-                          adding tracks.
+                          Ratings are assigned in the Tracklist Editor.
                         </small>
                       )}
                     </div>
                   </div>
 
                   <p className="cf-reference-count">
-                    Found {appearances.length} appearance(s)
-                    across{" "}
-                    {
-                      new Set(
-                        appearances.map(
-                          (item) => item.mixId
-                        )
-                      ).size
-                    }{" "}
+                    Found {appearances.length} appearance(s) across{" "}
+                    {new Set(appearances.map((item) => item.mixId)).size}{" "}
                     mix(es)
                   </p>
 
@@ -742,24 +809,18 @@ export default function App() {
                         <h4>{item.title}</h4>
 
                         <p>
-                          {item.dj} · Track #
-                          {item.position}
+                          {item.dj} · Track #{item.position}
                         </p>
 
-                        <strong>
-                          Next five tracks
-                        </strong>
+                        <strong>Next five tracks</strong>
 
                         {item.nextTracks.length > 0 ? (
                           <ol>
-                            {item.nextTracks.map(
-                              (song, index) => (
-                                <li key={index}>
-                                  {song.title} —{" "}
-                                  {song.artist}
-                                </li>
-                              )
-                            )}
+                            {item.nextTracks.map((song, index) => (
+                              <li key={index}>
+                                {song.title} — {song.artist}
+                              </li>
+                            ))}
                           </ol>
                         ) : (
                           <p>No following tracks.</p>
@@ -770,33 +831,29 @@ export default function App() {
                 </>
               ) : (
                 <p className="cf-muted">
-                  Select a song from a mix to see
-                  its references.
+                  Select a song from a mix to see its references.
                 </p>
               )}
             </section>
 
+            {/* Demo Notice */}
             {mode === "demo" && (
               <p className="cf-demo-note">
-                Sample mixes and ratings are for
-                demonstration only. They are not
-                stored in SQLite.
+                Sample mixes and ratings are for demonstration only. They are
+                not stored in SQLite.
               </p>
             )}
           </>
         )}
       </main>
 
-      {/* New Mix Modal */}
+      {/* New Mix Form */}
       {showNewMix && (
         <NewMixForm
           onSave={handleCreateMix}
-          onClose={() =>
-            setShowNewMix(false)
-          }
+          onClose={() => setShowNewMix(false)}
         />
       )}
     </div>
   );
 }
-
