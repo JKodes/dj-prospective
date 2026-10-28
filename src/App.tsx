@@ -171,6 +171,18 @@ export default function App() {
   const [savingMixTitle, setSavingMixTitle] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
+  useEffect(() => {
+    if (!successMessage) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setSuccessMessage("");
+    }, 4000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [successMessage]);
+
   // Song comparison and search
   const [selectedSong, setSelectedSong] = useState<string | null>(null);
   const [hoveredSong, setHoveredSong] = useState<string | null>(null);
