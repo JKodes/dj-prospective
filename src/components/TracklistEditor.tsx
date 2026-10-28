@@ -9,8 +9,8 @@ import {
   Pencil,
   Check,
   X,
-  ArrowUp,
-  ArrowDown,
+  ArrowUpFromDot,
+  ArrowDownToDotIcon,
 } from "lucide-react";
 
 import {
@@ -486,30 +486,22 @@ export default function TracklistEditor({
                     {"🔥".repeat(track.rating)}
                   </span>
 
-<div className="d-flex gap-1">
+                  <div className="d-flex gap-1">
                     <button
                       type="button"
                       className="btn btn-outline-light btn-sm"
-                      onClick={() =>
-                        void handleMove(track, "up")
-                      }
-                      disabled={
-                        busy ||
-                        editingId !== null ||
-                        index === 0
-                      }
+                      onClick={() => void handleMove(track, "up")}
+                      disabled={busy || editingId !== null || index === 0}
                       aria-label={`Move ${track.title} up`}
                       title="Move up"
                     >
-                      <ArrowUp size={16} />
+                      <ArrowUpFromDot size={16} />
                     </button>
 
                     <button
                       type="button"
                       className="btn btn-outline-light btn-sm"
-                      onClick={() =>
-                        void handleMove(track, "down")
-                      }
+                      onClick={() => void handleMove(track, "down")}
                       disabled={
                         busy ||
                         editingId !== null ||
@@ -518,7 +510,7 @@ export default function TracklistEditor({
                       aria-label={`Move ${track.title} down`}
                       title="Move down"
                     >
-                      <ArrowDown size={16} />
+                      <ArrowDownToDotIcon size={16} />
                     </button>
                   </div>
 
@@ -533,18 +525,7 @@ export default function TracklistEditor({
                     <Pencil size={17} />
                   </button>
 
-                  {/* Delete button */}
-                  <button
-                    type="button"
-                    className="btn btn-outline-light btn-sm"
-                    onClick={() => startEditing(track)}
-                    disabled={busy || editingId !== null}
-                    aria-label={`Edit ${track.title}`}
-                    title="Edit song"
-                  >
-                    <Pencil size={17} />
-                  </button>
-
+                 
                   <button
                     type="button"
                     className="btn btn-outline-danger btn-sm"
