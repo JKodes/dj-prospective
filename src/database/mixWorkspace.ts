@@ -13,6 +13,7 @@ export interface WorkspaceMix {
   title: string;
   dj: string;
   genre: string;
+  rating: number;
   tracks: WorkspaceTrack[];
 }
 
@@ -21,6 +22,7 @@ type MixRow = {
   title: string;
   dj_name: string;
   genre: string;
+  rating: number;
 };
 
 type TrackRow = WorkspaceTrack & {
@@ -32,7 +34,7 @@ export async function loadMixWorkspace(): Promise<WorkspaceMix[]> {
 
   // Load all DJ mixes
   const mixes = await db.select<MixRow[]>(`
-    SELECT id, title, dj_name, genre
+    SELECT id, title, dj_name, genre, rating
     FROM mixes
     ORDER BY created_at DESC, rowid DESC
   `);
@@ -58,6 +60,7 @@ export async function loadMixWorkspace(): Promise<WorkspaceMix[]> {
     title: mix.title,
     dj: mix.dj_name,
     genre: mix.genre,
+    rating: mix.rating,
     tracks: tracks
       .filter((track) => track.mix_id === mix.id)
       .map((track) => ({
@@ -70,9 +73,6 @@ export async function loadMixWorkspace(): Promise<WorkspaceMix[]> {
   }));
 }
 
-
-
-
 export type NewMixInput = {
   title: string;
   dj_name: string;
@@ -81,9 +81,7 @@ export type NewMixInput = {
   notes: string;
 };
 
-export async function createResearchMix(
-  input: NewMixInput
-): Promise<string> {
+export async function createResearchMix(input: NewMixInput): Promise<string> {
   const title = input.title.trim();
   const djName = input.dj_name.trim();
 
@@ -105,7 +103,7 @@ export async function createResearchMix(
       input.genre.trim(),
       input.source_url.trim(),
       input.notes.trim(),
-    ]
+    ],
   );
 
   return id;
