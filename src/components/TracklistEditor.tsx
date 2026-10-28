@@ -21,6 +21,7 @@ import {
 
 import { removeMixTrack } from "../database/removeMixTrack";
 import { editMixTrack } from "../database/editMixTrack";
+import { updateMixRating } from "../database/updateMixRating";
 
 import {
   reorderMixTrack,
@@ -31,6 +32,7 @@ type TracklistEditorProps = {
   mixId: string;
   mixTitle: string;
   djName: string;
+  mixRating: number;
   onBack: () => void;
 };
 
@@ -80,6 +82,7 @@ export default function TracklistEditor({
   mixId,
   mixTitle,
   djName,
+  mixRating,
   onBack,
 }: TracklistEditorProps) {
   const [tracks, setTracks] = useState<MixTrack[]>([]);
@@ -91,6 +94,10 @@ export default function TracklistEditor({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const [overallRating, setOverallRating] = useState(mixRating);
+  const [savingOverallRating, setSavingOverallRating] = useState(false);
+  const [ratingSuccess, setRatingSuccess] = useState("");
 
   const loadTracks = useCallback(async () => {
     const result = await getMixTracks(mixId);
@@ -254,6 +261,25 @@ export default function TracklistEditor({
     }
   }
 
+  async function handleMixRating(value: number) {
+    if (busy || savingOverallRating) return;
+
+    setSavingOverallRating(true);
+    setError("");
+    setRatingSuccess("");
+
+    try {
+      await updateMixRating(mixId, value);
+
+      setOverallRating(value);
+      setRatingSuccess("Mix rating saved successfully.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingOverallRating(false);
+    }
+  }
+
   // -----------------------------------------
   // Render
   // -----------------------------------------
@@ -274,6 +300,41 @@ export default function TracklistEditor({
         <h2>{mixTitle}</h2>
         <p className="cf-muted">{djName}</p>
       </header>
+
+      {/* Overall DJ Mix Rating */}
+      <div className="cf-editor-panel mb-4">
+        <h3>Overall Mix Rating</h3>
+
+        <div
+          className="d-flex align-items-center gap-2"
+          role="group"
+          aria-label="Overall mix rating"
+        >
+          {[1, 2, 3, 4, 5].map((value) => (
+            <button
+              key={value}
+              type="button"
+              className="btn btn-outline-light"
+              onClick={() => void handleMixRating(value)}
+              disabled={busy || savingOverallRating}
+              aria-label={`Rate mix ${value} out of 5`}
+              aria-pressed={overallRating === value}
+            >
+              {value <= overallRating ? "👌" : "◯"}
+            </button>
+          ))}
+
+          <span className="cf-muted ms-2">
+            {overallRating === 0 ? "Not rated" : `${overallRating}/5`}
+          </span>
+        </div>
+
+        {ratingSuccess && (
+          <p className="text-success mt-3 mb-0" role="status">
+            {ratingSuccess}
+          </p>
+        )}
+      </div>
 
       {error && (
         <div className="alert alert-danger" role="alert">
@@ -525,7 +586,6 @@ export default function TracklistEditor({
                     <Pencil size={17} />
                   </button>
 
-                 
                   <button
                     type="button"
                     className="btn btn-outline-danger btn-sm"
