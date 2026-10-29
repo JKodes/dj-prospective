@@ -8,6 +8,7 @@ import {
   Music2,
   Plus,
   Pencil,
+  Trash2,
 } from "lucide-react";
 
 import NewMixForm from "./components/NewMixForm";
@@ -22,6 +23,7 @@ import {
 } from "./database/mixWorkspace";
 
 import { updateMixTitle } from "./database/updateMixTitle";
+import { deleteMix } from "./database/deleteMix";
 
 import "./App.css";
 
@@ -188,6 +190,8 @@ export default function App() {
   const [editingMix, setEditingMix] = useState<Mix | null>(null);
 
   const [selectedMixIds, setSelectedMixIds] = useState<string[]>([]);
+  const [deletingMixId, setDeletingMixId] = useState<string | null>(null);
+
   const [showComparison, setShowComparison] = useState(false);
 
   function toggleMixSelection(mixId: string) {
@@ -200,6 +204,37 @@ export default function App() {
 
   function clearMixSelection() {
     setSelectedMixIds([]);
+  }
+
+  async function handleDeleteMix(mix: Mix) {
+    if (deletingMixId !== null) return;
+
+    const confirmed = window.confirm(
+      `Permanently delete "${mix.title}"?\n\n` +
+        "Its tracklist will be removed from your library.\n" +
+        "Songs in other DJ mixes will not be deleted.\n\n" +
+        "This action cannot be undone.",
+    );
+
+    if (!confirmed) return;
+
+    setDeletingMixId(mix.id);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      await deleteMix(mix.id);
+
+      setSavedMixes((current) => current.filter((item) => item.id !== mix.id));
+
+      setSelectedMixIds((current) => current.filter((id) => id !== mix.id));
+
+      setSuccessMessage(`"${mix.title}" was deleted successfully.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingMixId(null);
+    }
   }
 
   // Edit Mix Title
@@ -689,23 +724,37 @@ export default function App() {
               >
                 {mixes.map((mix) => (
                   <article className="cf-mix-card" key={mix.id}>
-                    {/* Mix comparison selection */}
+                    {/* Mix comparison selection & delete */}
                     {mode === "saved" && (
-                      <div className="d-flex align-items-center gap-2 px-3 pt-3">
-                        <input
-                          type="checkbox"
-                          className="form-check-input m-0"
-                          id={`select-mix-${mix.id}`}
-                          checked={selectedMixIds.includes(mix.id)}
-                          onChange={() => toggleMixSelection(mix.id)}
-                        />
+                      <div className="d-flex align-items-center justify-content-between px-3 pt-3">
+                        <div className="d-flex align-items-center gap-2">
+                          <input
+                            type="checkbox"
+                            className="form-check-input m-0"
+                            id={`select-mix-${mix.id}`}
+                            checked={selectedMixIds.includes(mix.id)}
+                            onChange={() => toggleMixSelection(mix.id)}
+                            disabled={deletingMixId !== null}
+                          />
 
-                        <label
-                          htmlFor={`select-mix-${mix.id}`}
-                          className="cf-muted"
+                          <label
+                            htmlFor={`select-mix-${mix.id}`}
+                            className="cf-muted"
+                          >
+                            Select for Comparison
+                          </label>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn btn-outline-danger btn-sm"
+                          onClick={() => void handleDeleteMix(mix)}
+                          disabled={deletingMixId !== null || savingMixTitle}
+                          aria-label={`Delete ${mix.title}`}
+                          title="Delete DJ mix"
                         >
-                          Select for comparison
-                        </label>
+                          <Trash2 size={18} />
+                        </button>
                       </div>
                     )}
 
