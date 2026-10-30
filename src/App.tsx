@@ -248,6 +248,25 @@ export default function App() {
 
   const mixes = mode === "demo" ? demoMixes : savedMixes;
 
+  const filteredMixes = useMemo(() => {
+    const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+
+    if (terms.length === 0) return mixes;
+
+    return mixes.filter((mix) => {
+      const searchableText = [
+        mix.title,
+        mix.dj,
+        mix.genre,
+        ...mix.tracks.flatMap((song) => [song.title, song.artist]),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return terms.every((term) => searchableText.includes(term));
+    });
+  }, [mixes, search]);
+
   const previewSongs = useMemo(() => {
     const previews = new Map<string, Song[]>();
 
@@ -420,6 +439,7 @@ export default function App() {
   function changeSearch(value: string) {
     setSearch(value);
     setHoveredSong(null);
+    setSelectedSong(null);
 
     if (!value.trim()) {
       setSelectedSong(null);
@@ -648,7 +668,7 @@ export default function App() {
                   type="search"
                   value={search}
                   onChange={(event) => changeSearch(event.target.value)}
-                  placeholder="Search a song or artist..."
+                  placeholder="Search songs, artists, DJs, genres, or mixes..."
                   aria-label="Search songs"
                 />
               </div>
@@ -699,9 +719,15 @@ export default function App() {
             )}
 
             {/* Mix Cards */}
+            {search.trim() && (
+              <p className="cf-muted">
+                Found {filteredMixes.length} of {mixes.length} mixes matching "
+                {search.trim()}"
+              </p>
+            )}
             {mode === "saved" && loading ? (
               <div className="cf-empty">Loading your DJ mixes...</div>
-            ) : mixes.length === 0 ? (
+            ) : filteredMixes.length === 0 ? (
               <div className="cf-empty">
                 <Disc3 size={40} className="cf-accent" />
 
@@ -718,7 +744,7 @@ export default function App() {
                 className="cf-mix-grid"
                 onMouseLeave={() => setHoveredSong(null)}
               >
-                {mixes.map((mix) => (
+                {filteredMixes.map((mix) => (
                   <article className="cf-mix-card" key={mix.id}>
                     {/* Mix comparison selection & delete */}
                     {mode === "saved" && (
