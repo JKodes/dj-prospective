@@ -37,15 +37,14 @@ type Appearance = {
   nextTracks: ComparisonSong[];
 };
 
-export default function MixComparison({
-  mixes,
-  onBack,
-}: Props) {
-  const [hoveredSongId, setHoveredSongId] =
-    useState<string | null>(null);
+function normalizeSongTitle(title: string): string {
+  return title.trim().replace(/\s+/g, " ").toLowerCase();
+}
 
-  const [selectedSongId, setSelectedSongId] =
-    useState<string | null>(null);
+export default function MixComparison({ mixes, onBack }: Props) {
+  const [hoveredSongId, setHoveredSongId] = useState<string | null>(null);
+
+  const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
 
@@ -65,30 +64,31 @@ export default function MixComparison({
     return [...songs.values()];
   }, [mixes]);
 
-  const currentSong = allSongs.find(
-    (song) => song.id === activeSongId
-  );
+  const currentSong = allSongs.find((song) => song.id === activeSongId);
+
+  const activeSongTitle = currentSong
+    ? normalizeSongTitle(currentSong.title)
+    : "";
 
   const appearances = useMemo<Appearance[]>(() => {
-    if (!activeSongId) return [];
+    if (!activeSongTitle) return [];
 
     return mixes.flatMap((mix) =>
       mix.tracks.flatMap((song, index) =>
-        song.id === activeSongId
-          ? [{
-              mixId: mix.id,
-              mixTitle: mix.title,
-              dj: mix.dj,
-              position: index + 1,
-              nextTracks: mix.tracks.slice(
-                index + 1,
-                index + 6
-              ),
-            }]
-          : []
-      )
+        normalizeSongTitle(song.title) === activeSongTitle
+          ? [
+              {
+                mixId: mix.id,
+                mixTitle: mix.title,
+                dj: mix.dj,
+                position: index + 1,
+                nextTracks: mix.tracks.slice(index + 1, index + 6),
+              },
+            ]
+          : [],
+      ),
     );
-  }, [mixes, activeSongId]);
+  }, [mixes, activeSongTitle]);
 
   // Compute highlighted positions once per selected song.
   const highlights = useMemo(() => {
@@ -137,7 +137,7 @@ export default function MixComparison({
     const match = allSongs.find(
       (song) =>
         song.title.toLowerCase().includes(query) ||
-        song.artist.toLowerCase().includes(query)
+        song.artist.toLowerCase().includes(query),
     );
 
     setSelectedSongId(match?.id ?? null);
@@ -156,13 +156,10 @@ export default function MixComparison({
 
       <header className="cf-header">
         <div>
-          <p className="cf-eyebrow">
-            MIX RESEARCH WORKSPACE
-          </p>
+          <p className="cf-eyebrow">MIX RESEARCH WORKSPACE</p>
           <h1>Selected Mix Comparison</h1>
           <p className="cf-muted">
-            Comparing {mixes.length} DJ mixes in original
-            playback order.
+            Comparing {mixes.length} DJ mixes in original playback order.
           </p>
         </div>
       </header>
@@ -173,9 +170,7 @@ export default function MixComparison({
           <input
             type="search"
             value={search}
-            onChange={(event) =>
-              handleSearch(event.target.value)
-            }
+            onChange={(event) => handleSearch(event.target.value)}
             placeholder="Find a song or artist..."
             aria-label="Search comparison songs"
           />
@@ -203,20 +198,13 @@ export default function MixComparison({
           return (
             <article className="cf-mix-card" key={mix.id}>
               <div className="cf-mix-heading">
-                <Disc3
-                  size={25}
-                  className="cf-accent"
-                />
+                <Disc3 size={25} className="cf-accent" />
                 <h2>{mix.title}</h2>
                 <p>{mix.dj}</p>
-                <span className="cf-genre">
-                  {mix.genre || "Mixed Genre"}
-                </span>
+                <span className="cf-genre">{mix.genre || "Mixed Genre"}</span>
                 <p className="cf-muted mt-2">
                   {mix.tracks.length} tracks ·{" "}
-                  {mix.rating > 0
-                    ? "👌".repeat(mix.rating)
-                    : "Not rated"}
+                  {mix.rating > 0 ? "👌".repeat(mix.rating) : "Not rated"}
                 </p>
               </div>
 
@@ -228,10 +216,9 @@ export default function MixComparison({
               ) : (
                 <div className="cf-tracks">
                   {mix.tracks.map((song, index) => {
-                    const state =
-                      highlighted?.selected.has(index)
-                        ? "selected"
-                        : highlighted?.following.has(index)
+                    const state = highlighted?.selected.has(index)
+                      ? "selected"
+                      : highlighted?.following.has(index)
                         ? "following"
                         : "normal";
 
@@ -240,18 +227,10 @@ export default function MixComparison({
                         key={`${mix.id}-${index}`}
                         type="button"
                         className={`cf-track ${state}`}
-                        onMouseEnter={() =>
-                          setHoveredSongId(song.id)
-                        }
-                        onFocus={() =>
-                          setHoveredSongId(song.id)
-                        }
-                        onBlur={() =>
-                          setHoveredSongId(null)
-                        }
-                        onClick={() =>
-                          setSelectedSongId(song.id)
-                        }
+                        onMouseEnter={() => setHoveredSongId(song.id)}
+                        onFocus={() => setHoveredSongId(song.id)}
+                        onBlur={() => setHoveredSongId(null)}
+                        onClick={() => setSelectedSongId(song.id)}
                         aria-pressed={state === "selected"}
                       >
                         <span className="cf-track-number">
@@ -264,17 +243,11 @@ export default function MixComparison({
                         </span>
 
                         {state === "selected" && (
-                          <Flame
-                            size={16}
-                            className="cf-accent"
-                          />
+                          <Flame size={16} className="cf-accent" />
                         )}
 
                         {state === "following" && (
-                          <ArrowRight
-                            size={15}
-                            className="cf-next-icon"
-                          />
+                          <ArrowRight size={15} className="cf-next-icon" />
                         )}
                       </button>
                     );
@@ -288,16 +261,10 @@ export default function MixComparison({
 
       <section className="cf-inspector">
         <div className="cf-inspector-heading">
-          <Music2
-            size={22}
-            className="cf-accent"
-          />
+          <Music2 size={22} className="cf-accent" />
           <div>
             <h2>Song Reference</h2>
-            <p>
-              Compare matching songs and their
-              following five tracks.
-            </p>
+            <p>Compare matching songs and their following five tracks.</p>
           </div>
         </div>
 
@@ -318,14 +285,8 @@ export default function MixComparison({
             </div>
 
             <p className="cf-reference-count">
-              Found {appearances.length} appearance(s)
-              across{" "}
-              {
-                new Set(
-                  appearances.map((item) => item.mixId)
-                ).size
-              }{" "}
-              mix(es)
+              Found {appearances.length} appearance(s) across{" "}
+              {new Set(appearances.map((item) => item.mixId)).size} mix(es)
             </p>
 
             <div className="cf-reference-grid">
@@ -358,8 +319,8 @@ export default function MixComparison({
           </>
         ) : (
           <p className="cf-muted">
-            Hover over or select a song to compare
-            its occurrences across the selected mixes.
+            Hover over or select a song to compare its occurrences across the
+            selected mixes.
           </p>
         )}
       </section>
