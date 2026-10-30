@@ -1,35 +1,38 @@
 import { getDatabase } from "./db";
 
 export async function deleteMix(mixId: string): Promise<void> {
-  if (!mixId.trim()) {
+  const id = mixId.trim();
+
+  if (!id) {
     throw new Error("Mix ID is required.");
   }
 
   const db = await getDatabase();
 
-  // Verify the mix exists before making changes.
+  // Verify this mix exists before deletion.
   const existing = await db.select<{ id: string }[]>(
     "SELECT id FROM mixes WHERE id = $1",
-    [mixId]
+    [id]
   );
 
   if (existing.length === 0) {
     throw new Error("Mix not found.");
   }
 
-  // Remove only track associations belonging to this mix.
+  // Remove the mix. Related mix_tracks should be
+  // deleted automatically by ON DELETE CASCADE.
   await db.execute(
-    "DELETE FROM mix_tracks WHERE mix_id = $1",
-    [mixId]
-  );
-
-  // Remove the mix itself.
-  const result = await db.execute(
     "DELETE FROM mixes WHERE id = $1",
-    [mixId]
+    [id]
   );
 
-  if (result.rowsAffected !== 1) {
+  // Verify that the mix was actually deleted.
+  const remaining = await db.select<{ id: string }[]>(
+    "SELECT id FROM mixes WHERE id = $1",
+    [id]
+  );
+
+  if (remaining.length > 0) {
     throw new Error("Could not delete the DJ mix.");
   }
 }

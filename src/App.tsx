@@ -192,6 +192,8 @@ export default function App() {
   const [selectedMixIds, setSelectedMixIds] = useState<string[]>([]);
   const [deletingMixId, setDeletingMixId] = useState<string | null>(null);
 
+  const [mixToDelete, setMixToDelete] = useState<Mix | null>(null);
+
   const [showComparison, setShowComparison] = useState(false);
 
   function toggleMixSelection(mixId: string) {
@@ -206,17 +208,10 @@ export default function App() {
     setSelectedMixIds([]);
   }
 
-  async function handleDeleteMix(mix: Mix) {
-    if (deletingMixId !== null) return;
+  async function handleDeleteMix() {
+    if (!mixToDelete || deletingMixId !== null) return;
 
-    const confirmed = window.confirm(
-      `Permanently delete "${mix.title}"?\n\n` +
-        "Its tracklist will be removed from your library.\n" +
-        "Songs in other DJ mixes will not be deleted.\n\n" +
-        "This action cannot be undone.",
-    );
-
-    if (!confirmed) return;
+    const mix = mixToDelete;
 
     setDeletingMixId(mix.id);
     setError("");
@@ -229,7 +224,8 @@ export default function App() {
 
       setSelectedMixIds((current) => current.filter((id) => id !== mix.id));
 
-      setSuccessMessage(`"${mix.title}" was deleted successfully.`);
+      setMixToDelete(null);
+      setSuccessMessage(`"${mix.title}" deleted successfully.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -748,7 +744,7 @@ export default function App() {
                         <button
                           type="button"
                           className="btn btn-outline-danger btn-sm"
-                          onClick={() => void handleDeleteMix(mix)}
+                          onClick={() => setMixToDelete(mix)}
                           disabled={deletingMixId !== null || savingMixTitle}
                           aria-label={`Delete ${mix.title}`}
                           title="Delete DJ mix"
@@ -1030,6 +1026,50 @@ export default function App() {
           onSave={handleCreateMix}
           onClose={() => setShowNewMix(false)}
         />
+      )}
+
+      {/* Delete Mix Confirmation Dialog */}
+      {mixToDelete && (
+        <div className="cf-modal-backdrop">
+          <div
+            className="cf-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-mix-title"
+          >
+            <h2 id="delete-mix-title">Delete DJ Mix?</h2>
+
+            <p>
+              Are you sure you want to permanently delete
+              <strong> "{mixToDelete.title}"</strong>?
+            </p>
+
+            <p className="cf-muted">
+              This will remove the mix and its tracklist. This action cannot be
+              undone.
+            </p>
+
+            <div className="d-flex justify-content-end gap-2 mt-4">
+              <button
+                type="button"
+                className="btn btn-outline-light"
+                onClick={() => setMixToDelete(null)}
+                disabled={deletingMixId !== null}
+              >
+                CANCEL
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => void handleDeleteMix()}
+                disabled={deletingMixId !== null}
+              >
+                {deletingMixId !== null ? "DELETING..." : "DELETE MIX"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
