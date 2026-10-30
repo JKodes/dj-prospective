@@ -19,6 +19,13 @@ pub fn run() {
             sql: include_str!("../migrations/add_mix_rating.sql"),
             kind: MigrationKind::Up,
         },
+
+        Migration {
+            version: 3,
+            description: "add_mix_year",
+            sql: include_str!("../migrations/add_mix_year.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
