@@ -43,6 +43,7 @@ type Mix = {
   title: string;
   dj: string;
   genre: string;
+  year?: number | null;
   rating: number;
   tracks: Song[];
 };
@@ -147,6 +148,7 @@ function convertMixes(rows: WorkspaceMix[]): Mix[] {
     title: mix.title,
     dj: mix.dj,
     genre: mix.genre,
+    year: mix.year,
     rating: mix.rating,
     tracks: mix.tracks.map((track) => ({
       id: track.id,
@@ -162,19 +164,14 @@ function convertMixes(rows: WorkspaceMix[]): Mix[] {
 // -----------------------------------------
 
 function getMixPreviewSongs(mix: Mix): Song[] {
-  const candidates = mix.tracks.filter(
-    (song) => song.rating >= 4
-  );
+  const candidates = mix.tracks.filter((song) => song.rating >= 4);
 
   const shuffled = [...candidates];
 
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
 
-    [shuffled[i], shuffled[j]] = [
-      shuffled[j],
-      shuffled[i],
-    ];
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
   return shuffled.slice(0, 3);
@@ -198,33 +195,23 @@ export default function App() {
   const [showNewMix, setShowNewMix] = useState(false);
 
   // Tracklist Editor
-  const [editingMix, setEditingMix] = useState<Mix | null>(
-    null
-  );
+  const [editingMix, setEditingMix] = useState<Mix | null>(null);
 
   // Mix Title Editing
-  const [renamingMixId, setRenamingMixId] = useState<
-    string | null
-  >(null);
+  const [renamingMixId, setRenamingMixId] = useState<string | null>(null);
   const [mixTitleDraft, setMixTitleDraft] = useState("");
   const [savingMixTitle, setSavingMixTitle] = useState(false);
 
   // Mix Selection and Comparison
-  const [selectedMixIds, setSelectedMixIds] = useState<
-    string[]
-  >([]);
+  const [selectedMixIds, setSelectedMixIds] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
 
   // Universal Search
   const [search, setSearch] = useState("");
 
   // Mix Deletion
-  const [deletingMixId, setDeletingMixId] = useState<
-    string | null
-  >(null);
-  const [mixToDelete, setMixToDelete] = useState<Mix | null>(
-    null
-  );
+  const [deletingMixId, setDeletingMixId] = useState<string | null>(null);
+  const [mixToDelete, setMixToDelete] = useState<Mix | null>(null);
 
   // -----------------------------------------
   // Active Workspace
@@ -265,9 +252,7 @@ export default function App() {
         }
       } catch (err) {
         if (active) {
-          setError(
-            err instanceof Error ? err.message : String(err)
-          );
+          setError(err instanceof Error ? err.message : String(err));
         }
       } finally {
         if (active) {
@@ -288,11 +273,7 @@ export default function App() {
   // -----------------------------------------
 
   const filteredMixes = useMemo(() => {
-    const terms = search
-      .trim()
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(Boolean);
+    const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
 
     if (terms.length === 0) {
       return mixes;
@@ -303,17 +284,13 @@ export default function App() {
         mix.title,
         mix.dj,
         mix.genre,
-        ...mix.tracks.flatMap((song) => [
-          song.title,
-          song.artist,
-        ]),
+        mix.year?.toString() ?? "",
+        ...mix.tracks.flatMap((song) => [song.title, song.artist]),
       ]
         .join(" ")
         .toLowerCase();
 
-      return terms.every((term) =>
-        searchableText.includes(term)
-      );
+      return terms.every((term) => searchableText.includes(term));
     });
   }, [mixes, search]);
 
@@ -330,26 +307,34 @@ export default function App() {
 
     const terms = query.split(/\s+/).filter(Boolean);
 
-    return filteredMixes.map((mix) => {
-      const matchingTracks = mix.tracks.flatMap(
-        (song, index) => {
-          const songText =
-            `${song.title} ${song.artist}`.toLowerCase();
+    return filteredMixes.flatMap((mix) => {
+      const mixMetadata = [
+        mix.title,
+        mix.dj,
+        mix.genre,
+        mix.year?.toString() ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
 
-          const matches = terms.every((term) =>
-            songText.includes(term)
-          );
+      // Remove terms already matched by mix metadata.
+      const songTerms = terms.filter((term) => !mixMetadata.includes(term));
 
-          return matches
-            ? [{ song, position: index + 1 }]
-            : [];
-        }
-      );
+      // Metadata-only searches should not show song discoveries.
+      if (songTerms.length === 0) {
+        return [];
+      }
 
-      return {
-        mix,
-        matchingTracks,
-      };
+      const matchingTracks = mix.tracks.flatMap((song, index) => {
+        const songText = `${song.title} ${song.artist}`.toLowerCase();
+
+        const matches = songTerms.every((term) => songText.includes(term));
+
+        return matches ? [{ song, position: index + 1 }] : [];
+      });
+
+      // Only include mixes that actually contain matching songs.
+      return matchingTracks.length > 0 ? [{ mix, matchingTracks }] : [];
     });
   }, [filteredMixes, search, mode]);
 
@@ -372,11 +357,8 @@ export default function App() {
   // -----------------------------------------
 
   const comparisonMixes = useMemo(
-    () =>
-      savedMixes.filter((mix) =>
-        selectedMixIds.includes(mix.id)
-      ),
-    [savedMixes, selectedMixIds]
+    () => savedMixes.filter((mix) => selectedMixIds.includes(mix.id)),
+    [savedMixes, selectedMixIds],
   );
 
   // -----------------------------------------
@@ -409,9 +391,7 @@ export default function App() {
       setEditingMix(null);
       setError("");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : String(err)
-      );
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -447,7 +427,7 @@ export default function App() {
     setSelectedMixIds((current) =>
       current.includes(mixId)
         ? current.filter((id) => id !== mixId)
-        : [...current, mixId]
+        : [...current, mixId],
     );
   }
 
@@ -505,32 +485,22 @@ export default function App() {
       await updateMixTitle(mix.id, title);
 
       setSavedMixes((current) =>
-        current.map((item) =>
-          item.id === mix.id
-            ? { ...item, title }
-            : item
-        )
+        current.map((item) => (item.id === mix.id ? { ...item, title } : item)),
       );
 
       setRenamingMixId(null);
       setMixTitleDraft("");
 
-      setSuccessMessage(
-        `Mix title successfully changed to "${title}".`
-      );
+      setSuccessMessage(`Mix title successfully changed to "${title}".`);
 
       try {
         const updated = await loadMixWorkspace();
         setSavedMixes(convertMixes(updated));
       } catch {
-        setError(
-          "Title saved, but the mix list could not be refreshed."
-        );
+        setError("Title saved, but the mix list could not be refreshed.");
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : String(err)
-      );
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSavingMixTitle(false);
     }
@@ -552,23 +522,15 @@ export default function App() {
     try {
       await deleteMix(mix.id);
 
-      setSavedMixes((current) =>
-        current.filter((item) => item.id !== mix.id)
-      );
+      setSavedMixes((current) => current.filter((item) => item.id !== mix.id));
 
-      setSelectedMixIds((current) =>
-        current.filter((id) => id !== mix.id)
-      );
+      setSelectedMixIds((current) => current.filter((id) => id !== mix.id));
 
       setMixToDelete(null);
 
-      setSuccessMessage(
-        `"${mix.title}" was deleted successfully.`
-      );
+      setSuccessMessage(`"${mix.title}" was deleted successfully.`);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : String(err)
-      );
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setDeletingMixId(null);
     }
@@ -602,28 +564,18 @@ export default function App() {
             DJ Mixes
           </button>
 
-          <button
-            type="button"
-            className="cf-nav-link"
-            disabled
-          >
+          <button type="button" className="cf-nav-link" disabled>
             <Search size={19} />
             Song Discovery
           </button>
 
-          <button
-            type="button"
-            className="cf-nav-link"
-            disabled
-          >
+          <button type="button" className="cf-nav-link" disabled>
             <ListMusic size={19} />
             My Crates
           </button>
         </nav>
 
-        <div className="cf-sidebar-bottom">
-          Personal DJ Research Workspace
-        </div>
+        <div className="cf-sidebar-bottom">Personal DJ Research Workspace</div>
       </aside>
 
       {/* Main Workspace */}
@@ -648,15 +600,13 @@ export default function App() {
             {/* Header */}
             <header className="cf-header">
               <div>
-                <p className="cf-eyebrow">
-                  MIX RESEARCH WORKSPACE
-                </p>
+                <p className="cf-eyebrow">MIX RESEARCH WORKSPACE</p>
 
                 <h1>DJ Mix Library</h1>
 
                 <p className="cf-muted">
-                  Research DJ mixes, discover songs,
-                  and compare track sequences.
+                  Research DJ mixes, discover songs, and compare track
+                  sequences.
                 </p>
               </div>
 
@@ -672,10 +622,7 @@ export default function App() {
 
             {/* Errors */}
             {error && (
-              <div
-                className="alert alert-danger"
-                role="alert"
-              >
+              <div className="alert alert-danger" role="alert">
                 {error}
               </div>
             )}
@@ -687,17 +634,14 @@ export default function App() {
                 role="status"
               >
                 <span>
-                  <strong>Success!</strong>{" "}
-                  {successMessage}
+                  <strong>Success!</strong> {successMessage}
                 </span>
 
                 <button
                   type="button"
                   className="btn-close"
                   aria-label="Dismiss success message"
-                  onClick={() =>
-                    setSuccessMessage("")
-                  }
+                  onClick={() => setSuccessMessage("")}
                 />
               </div>
             )}
@@ -706,9 +650,7 @@ export default function App() {
             <div className="cf-workspace-tabs">
               <button
                 type="button"
-                className={
-                  mode === "saved" ? "active" : ""
-                }
+                className={mode === "saved" ? "active" : ""}
                 onClick={() => changeMode("saved")}
                 disabled={savingMixTitle}
               >
@@ -717,9 +659,7 @@ export default function App() {
 
               <button
                 type="button"
-                className={
-                  mode === "demo" ? "active" : ""
-                }
+                className={mode === "demo" ? "active" : ""}
                 onClick={() => changeMode("demo")}
                 disabled={savingMixTitle}
               >
@@ -735,9 +675,7 @@ export default function App() {
                 <input
                   type="search"
                   value={search}
-                  onChange={(event) =>
-                    changeSearch(event.target.value)
-                  }
+                  onChange={(event) => changeSearch(event.target.value)}
                   placeholder="Search songs, artists, DJs, genres, or mixes..."
                   aria-label="Search DJ mix library"
                 />
@@ -775,25 +713,21 @@ export default function App() {
             {/* Search Results Count */}
             {search.trim() && (
               <p className="cf-muted">
-                Found {filteredMixes.length} of {mixes.length} mixes
-                matching "{search.trim()}"
+                Found {filteredMixes.length} of {mixes.length} mixes matching "
+                {search.trim()}"
               </p>
             )}
 
             {/* Mix Library */}
             {mode === "saved" && loading ? (
-              <div className="cf-empty">
-                Loading your DJ mixes...
-              </div>
+              <div className="cf-empty">Loading your DJ mixes...</div>
             ) : mixes.length === 0 ? (
               <div className="cf-empty">
                 <Disc3 size={40} className="cf-accent" />
 
                 <h2>No mixes saved yet</h2>
 
-                <p>
-                  Click NEW MIX to start documenting a DJ's set.
-                </p>
+                <p>Click NEW MIX to start documenting a DJ's set.</p>
               </div>
             ) : filteredMixes.length === 0 ? (
               <div className="cf-empty">
@@ -802,17 +736,13 @@ export default function App() {
                 <h2>No matching mixes</h2>
 
                 <p>
-                  Try another song title, artist, DJ name,
-                  genre, or mix title.
+                  Try another song title, artist, DJ name, genre, or mix title.
                 </p>
               </div>
             ) : (
               <section className="cf-mix-grid">
                 {filteredMixes.map((mix) => (
-                  <article
-                    className="cf-mix-card"
-                    key={mix.id}
-                  >
+                  <article className="cf-mix-card" key={mix.id}>
                     {/* Comparison Selection and Delete */}
                     {mode === "saved" && (
                       <div className="d-flex align-items-center justify-content-between px-3 pt-3">
@@ -821,12 +751,8 @@ export default function App() {
                             type="checkbox"
                             className="form-check-input m-0"
                             id={`select-mix-${mix.id}`}
-                            checked={selectedMixIds.includes(
-                              mix.id
-                            )}
-                            onChange={() =>
-                              toggleMixSelection(mix.id)
-                            }
+                            checked={selectedMixIds.includes(mix.id)}
+                            onChange={() => toggleMixSelection(mix.id)}
                             disabled={deletingMixId !== null}
                           />
 
@@ -841,13 +767,8 @@ export default function App() {
                         <button
                           type="button"
                           className="btn btn-outline-danger btn-sm"
-                          onClick={() =>
-                            setMixToDelete(mix)
-                          }
-                          disabled={
-                            deletingMixId !== null ||
-                            savingMixTitle
-                          }
+                          onClick={() => setMixToDelete(mix)}
+                          disabled={deletingMixId !== null || savingMixTitle}
                           aria-label={`Delete ${mix.title}`}
                           title="Delete DJ mix"
                         >
@@ -858,13 +779,9 @@ export default function App() {
 
                     {/* Mix Heading */}
                     <div className="cf-mix-heading">
-                      <Disc3
-                        size={25}
-                        className="cf-accent"
-                      />
+                      <Disc3 size={25} className="cf-accent" />
 
-                      {mode === "saved" &&
-                      renamingMixId === mix.id ? (
+                      {mode === "saved" && renamingMixId === mix.id ? (
                         <form
                           className="cf-rename-form"
                           onSubmit={(event) => {
@@ -884,9 +801,7 @@ export default function App() {
                             type="text"
                             value={mixTitleDraft}
                             onChange={(event) =>
-                              setMixTitleDraft(
-                                event.target.value
-                              )
+                              setMixTitleDraft(event.target.value)
                             }
                             maxLength={150}
                             disabled={savingMixTitle}
@@ -898,14 +813,9 @@ export default function App() {
                             <button
                               type="submit"
                               className="btn cf-primary-btn btn-sm"
-                              disabled={
-                                savingMixTitle ||
-                                !mixTitleDraft.trim()
-                              }
+                              disabled={savingMixTitle || !mixTitleDraft.trim()}
                             >
-                              {savingMixTitle
-                                ? "SAVING..."
-                                : "SAVE"}
+                              {savingMixTitle ? "SAVING..." : "SAVE"}
                             </button>
 
                             <button
@@ -926,9 +836,7 @@ export default function App() {
                             <button
                               type="button"
                               className="btn btn-outline-light btn-sm"
-                              onClick={() =>
-                                startRenamingMix(mix)
-                              }
+                              onClick={() => startRenamingMix(mix)}
                               disabled={savingMixTitle}
                               aria-label={`Edit title of ${mix.title}`}
                               title="Edit mix title"
@@ -943,15 +851,14 @@ export default function App() {
 
                       <span className="cf-genre">
                         {mix.genre || "Mixed Genre"}
+                        {mix.year != null && ` · ${mix.year}`}
                       </span>
                     </div>
 
                     {/* Overall Mix Rating — Display Only */}
                     {mode === "saved" && (
                       <div className="cf-mix-rating">
-                        <span className="cf-muted">
-                          YOUR MIX RATING
-                        </span>
+                        <span className="cf-muted">YOUR MIX RATING</span>
 
                         <span
                           aria-label={
@@ -966,9 +873,7 @@ export default function App() {
                         </span>
 
                         {mix.rating > 0 && (
-                          <small className="cf-muted">
-                            {mix.rating}/5
-                          </small>
+                          <small className="cf-muted">{mix.rating}/5</small>
                         )}
                       </div>
                     )}
@@ -980,9 +885,7 @@ export default function App() {
                           type="button"
                           className="btn cf-primary-btn w-100"
                           disabled={savingMixTitle}
-                          onClick={() =>
-                            setEditingMix(mix)
-                          }
+                          onClick={() => setEditingMix(mix)}
                         >
                           EDIT TRACKLIST
                         </button>
@@ -999,52 +902,35 @@ export default function App() {
                         </p>
                       </div>
 
-                      {(previewSongs.get(mix.id) ?? [])
-                        .length === 0 ? (
+                      {(previewSongs.get(mix.id) ?? []).length === 0 ? (
                         <div className="cf-no-tracks">
                           <Music2 size={25} />
 
-                          <p>
-                            No highly rated songs yet.
-                          </p>
+                          <p>No highly rated songs yet.</p>
 
-                          <small>
-                            Rate songs 4 or 5 🔥 to
-                            see them here.
-                          </small>
+                          <small>Rate songs 4 or 5 🔥 to see them here.</small>
                         </div>
                       ) : (
-                        (previewSongs.get(mix.id) ?? []).map(
-                          (song, index) => (
-                            <div
-                              key={`${mix.id}-${song.id}-${index}`}
-                              className="cf-track"
-                            >
-                              <span className="cf-track-number">
-                                {String(index + 1).padStart(
-                                  2,
-                                  "0"
-                                )}
-                              </span>
+                        (previewSongs.get(mix.id) ?? []).map((song, index) => (
+                          <div
+                            key={`${mix.id}-${song.id}-${index}`}
+                            className="cf-track"
+                          >
+                            <span className="cf-track-number">
+                              {String(index + 1).padStart(2, "0")}
+                            </span>
 
-                              <span className="cf-track-info">
-                                <strong>
-                                  {song.title}
-                                </strong>
+                            <span className="cf-track-info">
+                              <strong>{song.title}</strong>
 
-                                <small>
-                                  {song.artist}
-                                </small>
-                              </span>
+                              <small>{song.artist}</small>
+                            </span>
 
-                              <span
-                                aria-label={`${song.rating} out of 5 fires`}
-                              >
-                                {"🔥".repeat(song.rating)}
-                              </span>
-                            </div>
-                          )
-                        )
+                            <span aria-label={`${song.rating} out of 5 fires`}>
+                              {"🔥".repeat(song.rating)}
+                            </span>
+                          </div>
+                        ))
                       )}
                     </div>
                   </article>
@@ -1053,98 +939,71 @@ export default function App() {
             )}
 
             {/* Library Discoveries */}
-            {mode === "saved" && search.trim() && (
+            {mode === "saved" && libraryDiscoveries.length > 0 && (
               <section className="cf-inspector">
                 <div className="cf-inspector-heading">
-                  <Search
-                    size={22}
-                    className="cf-accent"
-                  />
+                  <Search size={22} className="cf-accent" />
 
                   <div>
                     <h2>Library Discoveries</h2>
 
-                    <p>
-                      Mixes matching "{search.trim()}"
-                    </p>
+                    <p>Mixes matching "{search.trim()}"</p>
                   </div>
                 </div>
 
                 {libraryDiscoveries.length === 0 ? (
-                  <p className="cf-muted">
-                    No matching DJ mixes found.
-                  </p>
+                  <p className="cf-muted">No matching DJ mixes found.</p>
                 ) : (
                   <div className="cf-reference-grid">
-                    {libraryDiscoveries.map(
-                      ({ mix, matchingTracks }) => (
-                        <div
-                          className="cf-reference-card"
-                          key={mix.id}
-                        >
-                          <div className="d-flex align-items-start gap-2">
-                            <input
-                              type="checkbox"
-                              className="form-check-input mt-1"
-                              id={`discovery-${mix.id}`}
-                              checked={selectedMixIds.includes(
-                                mix.id
-                              )}
-                              onChange={() =>
-                                toggleMixSelection(mix.id)
-                              }
-                              aria-label={`Select ${mix.title} for comparison`}
-                            />
+                    {libraryDiscoveries.map(({ mix, matchingTracks }) => (
+                      <div className="cf-reference-card" key={mix.id}>
+                        <div className="d-flex align-items-start gap-2">
+                          <input
+                            type="checkbox"
+                            className="form-check-input mt-1"
+                            id={`discovery-${mix.id}`}
+                            checked={selectedMixIds.includes(mix.id)}
+                            onChange={() => toggleMixSelection(mix.id)}
+                            aria-label={`Select ${mix.title} for comparison`}
+                          />
 
-                            <div className="flex-grow-1">
-                              <label
-                                htmlFor={`discovery-${mix.id}`}
-                                className="fw-bold"
-                              >
-                                {mix.title}
-                              </label>
+                          <div className="flex-grow-1">
+                            <label
+                              htmlFor={`discovery-${mix.id}`}
+                              className="fw-bold"
+                            >
+                              {mix.title}
+                            </label>
 
+                            <p className="cf-muted">
+                              {mix.dj} · {mix.genre || "Mixed Genre"}
+                            </p>
+
+                            {matchingTracks.length > 0 ? (
+                              <>
+                                <strong>Matching Songs</strong>
+
+                                <ol>
+                                  {matchingTracks.map(({ song, position }) => (
+                                    <li key={`${song.id}-${position}`}>
+                                      {song.title}
+                                      {" — "}
+                                      {song.artist}
+                                      {" · Track #"}
+                                      {position}
+                                    </li>
+                                  ))}
+                                </ol>
+                              </>
+                            ) : (
                               <p className="cf-muted">
-                                {mix.dj} ·{" "}
-                                {mix.genre || "Mixed Genre"}
+                                Matches mix title, DJ, or genre.
                               </p>
-
-                              {matchingTracks.length > 0 ? (
-                                <>
-                                  <strong>
-                                    Matching Songs
-                                  </strong>
-
-                                  <ol>
-                                    {matchingTracks.map(
-                                      ({
-                                        song,
-                                        position,
-                                      }) => (
-                                        <li
-                                          key={`${song.id}-${position}`}
-                                        >
-                                          {song.title}
-                                          {" — "}
-                                          {song.artist}
-                                          {" · Track #"}
-                                          {position}
-                                        </li>
-                                      )
-                                    )}
-                                  </ol>
-                                </>
-                              ) : (
-                                <p className="cf-muted">
-                                  Matches mix title, DJ,
-                                  or genre.
-                                </p>
-                              )}
-                            </div>
+                            )}
                           </div>
                         </div>
-                      )
-                    )}
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -1163,8 +1022,8 @@ export default function App() {
             {/* Demo Notice */}
             {mode === "demo" && (
               <p className="cf-demo-note">
-                Sample mixes are for demonstration
-                only. They are not stored in SQLite.
+                Sample mixes are for demonstration only. They are not stored in
+                SQLite.
               </p>
             )}
           </>
@@ -1188,32 +1047,23 @@ export default function App() {
             aria-modal="true"
             aria-labelledby="delete-mix-title"
           >
-            <h2 id="delete-mix-title">
-              Delete DJ Mix?
-            </h2>
+            <h2 id="delete-mix-title">Delete DJ Mix?</h2>
 
             <p>
-              Are you sure you want to permanently
-              delete{" "}
-              <strong>
-                "{mixToDelete.title}"
-              </strong>
-              ?
+              Are you sure you want to permanently delete{" "}
+              <strong>"{mixToDelete.title}"</strong>?
             </p>
 
             <p className="cf-muted">
-              This removes the mix and its tracklist.
-              Songs in other mixes will remain.
-              This action cannot be undone.
+              This removes the mix and its tracklist. Songs in other mixes will
+              remain. This action cannot be undone.
             </p>
 
             <div className="d-flex justify-content-end gap-2 mt-4">
               <button
                 type="button"
                 className="btn btn-outline-light"
-                onClick={() =>
-                  setMixToDelete(null)
-                }
+                onClick={() => setMixToDelete(null)}
                 disabled={deletingMixId !== null}
               >
                 CANCEL
@@ -1222,14 +1072,10 @@ export default function App() {
               <button
                 type="button"
                 className="btn btn-danger"
-                onClick={() =>
-                  void handleDeleteMix()
-                }
+                onClick={() => void handleDeleteMix()}
                 disabled={deletingMixId !== null}
               >
-                {deletingMixId !== null
-                  ? "DELETING..."
-                  : "DELETE MIX"}
+                {deletingMixId !== null ? "DELETING..." : "DELETE MIX"}
               </button>
             </div>
           </div>

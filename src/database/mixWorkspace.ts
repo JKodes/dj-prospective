@@ -13,6 +13,7 @@ export interface WorkspaceMix {
   title: string;
   dj: string;
   genre: string;
+  year: number | null;
   rating: number;
   tracks: WorkspaceTrack[];
 }
@@ -22,6 +23,7 @@ type MixRow = {
   title: string;
   dj_name: string;
   genre: string;
+  year: number | null;
   rating: number;
 };
 
@@ -34,7 +36,7 @@ export async function loadMixWorkspace(): Promise<WorkspaceMix[]> {
 
   // Load all DJ mixes
   const mixes = await db.select<MixRow[]>(`
-    SELECT id, title, dj_name, genre, rating
+    SELECT id, title, dj_name, genre, year, rating
     FROM mixes
     ORDER BY created_at DESC, rowid DESC
   `);
@@ -60,6 +62,7 @@ export async function loadMixWorkspace(): Promise<WorkspaceMix[]> {
     title: mix.title,
     dj: mix.dj_name,
     genre: mix.genre,
+    year: mix.year,
     rating: mix.rating,
     tracks: tracks
       .filter((track) => track.mix_id === mix.id)
@@ -77,6 +80,7 @@ export type NewMixInput = {
   title: string;
   dj_name: string;
   genre: string;
+  year: number | null;
   source_url: string;
   notes: string;
   rating: number;
@@ -90,20 +94,33 @@ export async function createResearchMix(input: NewMixInput): Promise<string> {
     throw new Error("Mix title and DJ name are required.");
   }
 
+  if (
+    input.year !== null &&
+    (!Number.isInteger(input.year) || input.year < 1900 || input.year > 2100)
+  ) {
+    throw new Error("Mix year must be between 1900 and 2100.");
+  }
+
+  if (!Number.isInteger(input.rating) || input.rating < 0 || input.rating > 5) {
+    throw new Error("Mix rating must be between 0 and 5.");
+  }
+
   const db = await getDatabase();
   const id = crypto.randomUUID();
 
   await db.execute(
     `INSERT INTO mixes
-      (id, title, dj_name, genre, source_url, notes)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+      (id, title, dj_name, genre, year, source_url, notes, rating)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       id,
       title,
       djName,
       input.genre.trim(),
+      input.year,
       input.source_url.trim(),
       input.notes.trim(),
+      input.rating,
     ],
   );
 

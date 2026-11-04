@@ -11,6 +11,7 @@ const initialForm: NewMixInput = {
   title: "",
   dj_name: "",
   genre: "",
+  year: null,
   source_url: "",
   notes: "",
   rating: 0,
@@ -22,12 +23,19 @@ export default function NewMixForm({ onSave, onClose }: Props) {
   const [error, setError] = useState("");
   const [mixRating, setMixRating] = useState(0);
 
-  function change(field: keyof NewMixInput, value: string) {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
+  function change(
+    field: "title" | "dj_name" | "genre" | "source_url" | "notes",
+    value: string,
+  ) {
+    setForm((current) => ({ ...current, [field]: value }));
   }
+
+  // function change(field: keyof NewMixInput, value: string) {
+  // setForm((current) => ({
+  // ...current,
+  // [field]: value,
+  // }));
+  // }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -119,6 +127,26 @@ export default function NewMixForm({ onSave, onClose }: Props) {
             value={form.genre}
             onChange={(e) => change("genre", e.target.value)}
             placeholder="Dancehall / Afrobeats"
+          />
+
+          <label htmlFor="mix-year" className="form-label">
+            Mix Year
+          </label>
+          <input
+            id="mix-year"
+            type="number"
+            className="form-control mb-3"
+            value={form.year ?? ""}
+            onChange={(e) =>
+              setForm((current) => ({
+                ...current,
+                year: e.target.value === "" ? null : Number(e.target.value),
+              }))
+            }
+            min={1900}
+            max={2100}
+            step={1}
+            placeholder="2026"
           />
 
           <label htmlFor="mix-source" className="form-label">
