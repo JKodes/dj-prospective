@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Disc3,
@@ -24,6 +24,12 @@ import {
 
 import { updateMixTitle } from "./database/updateMixTitle";
 import { deleteMix } from "./database/deleteMix";
+
+import { supabase } from "./lib/supabase";
+import AuthScreen from "./components/AuthScreen";
+import type { Session } from "@supabase/supabase-js";
+
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 import "./App.css";
 
@@ -182,6 +188,164 @@ function getMixPreviewSongs(mix: Mix): Song[] {
 // -----------------------------------------
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const processedDeepLinks = useRef(new Set<string>());
+
+  useEffect(() => {
+    let active = true;
+    let authEventReceived = false;
+
+    async function initializeAuth() {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (!active) return;
+
+      if (error) {
+        setError(error.message);
+      }
+
+      if (!authEventReceived) {
+        setSession(data.session);
+      }
+      setAuthLoading(false);
+    }
+
+    void initializeAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      authEventReceived = true;
+      setSession(nextSession);
+
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecovery(true);
+        setAuthError("");
+      }
+
+      if (event === "SIGNED_OUT") {
+        setPasswordRecovery(false);
+      }
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+
+    async function handleDeepLinks(urls: string[]) {
+      for (const rawUrl of urls) {
+        let url: URL;
+
+        try {
+          url = new URL(rawUrl);
+        } catch {
+          continue;
+        }
+
+        if (
+          url.protocol !== "cratefire:" ||
+          url.hostname !== "auth" ||
+          url.pathname !== "/reset-password"
+        ) {
+          continue;
+        }
+
+        if (processedDeepLinks.current.has(rawUrl)) {
+          continue;
+        }
+
+        processedDeepLinks.current.add(rawUrl);
+
+        const linkError =
+          url.searchParams.get("error_description") ??
+          url.searchParams.get("error");
+
+        if (linkError) {
+          setAuthError(linkError);
+          continue;
+        }
+
+        const code = url.searchParams.get("code");
+
+        if (!code) {
+          setAuthError(
+            "The password reset link did not contain an authorization code.",
+          );
+          continue;
+        }
+
+        try {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+          if (!active) return;
+
+          if (error) throw error;
+
+          setAuthError("");
+        } catch (err) {
+          if (!active) return;
+
+          setAuthError(
+            err instanceof Error
+              ? err.message
+              : "Unable to complete password recovery.",
+          );
+        }
+      }
+    }
+
+    async function initializeDeepLinks() {
+      unlisten = await onOpenUrl((urls) => {
+        void handleDeepLinks(urls);
+      });
+
+      if (!active) {
+        unlisten();
+        return;
+      }
+
+      try {
+        const currentUrls = await getCurrent();
+
+        if (currentUrls) {
+          await handleDeepLinks(currentUrls);
+        }
+      } catch (err) {
+        if (active) {
+          setAuthError(
+            err instanceof Error
+              ? err.message
+              : "Unable to read the password recovery link.",
+          );
+        }
+      }
+    }
+
+    void initializeDeepLinks().catch((err) => {
+      if (active) {
+        setAuthError(
+          err instanceof Error
+            ? err.message
+            : "Unable to initialize deep links.",
+        );
+      }
+    });
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, []);
   // Saved DJ mixes
   const [savedMixes, setSavedMixes] = useState<Mix[]>([]);
 
@@ -536,6 +700,34 @@ export default function App() {
     }
   }
 
+  if (authLoading) {
+    return (
+      <div className="cratefire-app d-flex justify-content-center align-items-center">
+        <p className="cf-muted">Loading CrateFire...</p>
+      </div>
+    );
+  }
+
+  if (passwordRecovery) {
+  return (
+    <AuthScreen
+      onAuthenticated={() => {}}
+      passwordRecovery
+      externalError={authError}
+      onPasswordResetComplete={() => setPasswordRecovery(false)}
+    />
+  );
+}
+
+if (!session) {
+  return (
+    <AuthScreen
+      onAuthenticated={() => {}}
+      externalError={authError}
+    />
+  );
+}
+
   // -----------------------------------------
   // Render
   // -----------------------------------------
@@ -575,7 +767,23 @@ export default function App() {
           </button>
         </nav>
 
-        <div className="cf-sidebar-bottom">Personal DJ Research Workspace</div>
+        <div className="cf-sidebar-bottom">
+          <p>Personal DJ Research Workspace</p>
+
+          <button
+            type="button"
+            className="btn btn-outline-light btn-sm w-100 mt-3"
+            onClick={async () => {
+              const { error } = await supabase.auth.signOut();
+
+              if (error) {
+                setError(error.message);
+              }
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
       </aside>
 
       {/* Main Workspace */}
