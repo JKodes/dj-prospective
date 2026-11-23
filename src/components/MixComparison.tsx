@@ -38,7 +38,11 @@ type Appearance = {
 };
 
 function normalizeSongTitle(title: string): string {
-  return title.trim().replace(/\s+/g, " ").toLowerCase();
+  return title
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s*([()])\s*/g, "$1")
+    .toLowerCase();
 }
 
 export default function MixComparison({ mixes, onBack }: Props) {
@@ -101,9 +105,9 @@ export default function MixComparison({ mixes, onBack }: Props) {
       const selected = new Set<number>();
       const following = new Set<number>();
 
-      if (activeSongId) {
+      if (activeSongTitle) {
         mix.tracks.forEach((song, index) => {
-          if (song.id !== activeSongId) return;
+          if (normalizeSongTitle(song.title) !== activeSongTitle) return;
 
           selected.add(index);
 
@@ -121,7 +125,7 @@ export default function MixComparison({ mixes, onBack }: Props) {
     }
 
     return result;
-  }, [mixes, activeSongId]);
+  }, [mixes, activeSongTitle]);
 
   function handleSearch(value: string) {
     setSearch(value);
