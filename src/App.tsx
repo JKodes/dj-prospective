@@ -29,6 +29,8 @@ import { supabase } from "./lib/supabase";
 import AuthScreen from "./components/AuthScreen";
 import type { Session } from "@supabase/supabase-js";
 
+import CloudBackupButton from "./components/CloudBackupButton";
+
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 import "./App.css";
@@ -709,24 +711,19 @@ export default function App() {
   }
 
   if (passwordRecovery) {
-  return (
-    <AuthScreen
-      onAuthenticated={() => {}}
-      passwordRecovery
-      externalError={authError}
-      onPasswordResetComplete={() => setPasswordRecovery(false)}
-    />
-  );
-}
+    return (
+      <AuthScreen
+        onAuthenticated={() => {}}
+        passwordRecovery
+        externalError={authError}
+        onPasswordResetComplete={() => setPasswordRecovery(false)}
+      />
+    );
+  }
 
-if (!session) {
-  return (
-    <AuthScreen
-      onAuthenticated={() => {}}
-      externalError={authError}
-    />
-  );
-}
+  if (!session) {
+    return <AuthScreen onAuthenticated={() => {}} externalError={authError} />;
+  }
 
   // -----------------------------------------
   // Render
@@ -769,6 +766,8 @@ if (!session) {
 
         <div className="cf-sidebar-bottom">
           <p>Personal DJ Research Workspace</p>
+
+          <CloudBackupButton />
 
           <button
             type="button"
