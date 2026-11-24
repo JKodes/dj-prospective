@@ -1,4 +1,5 @@
 import { getDatabase } from "./db";
+import { supabase } from "../lib/supabase";
 
 export type BackupRow = Record<string, unknown>;
 
@@ -48,4 +49,40 @@ export async function exportCloudBackup(): Promise<CrateFireBackup> {
       crate_tracks: crateTracks,
     },
   };
+}
+
+
+export async function uploadCloudBackup(): Promise<void> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) {
+    throw userError;
+  }
+
+  if (!user) {
+    throw new Error("You must be signed in to back up your data.");
+  }
+
+  const backup = await exportCloudBackup();
+
+  const { error } = await supabase
+    .from("user_backups")
+    .upsert(
+      {
+        user_id: user.id,
+        backup_version: backup.backupVersion,
+        payload: backup,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "user_id",
+      }
+    );
+
+  if (error) {
+    throw error;
+  }
 }
