@@ -30,6 +30,7 @@ import AuthScreen from "./components/AuthScreen";
 import type { Session } from "@supabase/supabase-js";
 
 import CloudBackupButton from "./components/CloudBackupButton";
+import GreetingCycle from "./components/GreetingCycle";
 
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
@@ -192,6 +193,9 @@ function getMixPreviewSongs(mix: Mix): Song[] {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  const username = session?.user.user_metadata?.username?.trim() || "DJ";
+  session?.user.email?.split("@")[0] || "DJ";
 
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -810,7 +814,7 @@ export default function App() {
                 <p className="cf-eyebrow">MIX RESEARCH WORKSPACE</p>
 
                 <h1>DJ Mix Library</h1>
-
+                <GreetingCycle displayName={username} />
                 <p className="cf-muted">
                   Research DJ mixes, discover songs, and compare track
                   sequences.

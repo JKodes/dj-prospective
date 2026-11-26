@@ -72,7 +72,7 @@ export default function AuthScreen({
           password,
           options: {
             data: {
-              display_name: displayName.trim() || undefined,
+              display_name: displayName.trim(),
             },
           },
         });
@@ -190,7 +190,23 @@ export default function AuthScreen({
                           />
                         </div>
                       )}
-
+                      {mode === "signup" && (
+                        <div className="mb-3">
+                          <label htmlFor="displayName" className="form-label">
+                            Display Name
+                          </label>
+                          <input
+                            id="displayName"
+                            type="text"
+                            className="form-control"
+                            value={displayName}
+                            onChange={(e) => setDisplayName(e.target.value)}
+                            placeholder="What should we call you?"
+                            autoComplete="name"
+                            required
+                          />
+                        </div>
+                      )}
                       <div className="mb-3">
                         <label className="form-label" htmlFor="auth-email">
                           Email
