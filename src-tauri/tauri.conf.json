@@ -12,9 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "cratefire",
-        "width": 800,
-        "height": 600
+        "title": "Crate Fire",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true
       }
     ],
     "security": {
