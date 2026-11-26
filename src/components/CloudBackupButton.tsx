@@ -7,20 +7,21 @@ import {
 const LAST_BACKUP_KEY = "cratefire:lastSuccessfulCloudBackup";
 const LAST_RETRIEVAL_KEY = "cratefire:lastSuccessfulCloudRetrieval";
 
+type FailedAction = "backup" | "retrieve" | null;
+
 export default function CloudBackupButton() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [errorDetails, setErrorDetails] = useState("");
   const [failed, setFailed] = useState(false);
+  const [failedAction, setFailedAction] = useState<FailedAction>(null);
 
-  const [failedAction, setFailedAction] = useState<
-    "backup" | "retrieve" | null
-  >(null);
   const [lastBackup, setLastBackup] = useState(
-    () => localStorage.getItem(LAST_BACKUP_KEY) || "",
+    () => localStorage.getItem(LAST_BACKUP_KEY) || ""
   );
+
   const [lastRetrieval, setLastRetrieval] = useState(
-    () => localStorage.getItem(LAST_RETRIEVAL_KEY) || "",
+    () => localStorage.getItem(LAST_RETRIEVAL_KEY) || ""
   );
 
   function resetFeedback() {
@@ -46,10 +47,13 @@ export default function CloudBackupButton() {
       setMessage("Your CrateFire data was backed up successfully.");
     } catch (err) {
       setFailed(true);
+      setFailedAction("backup");
       setMessage(
-        "Cloud backup failed. Your local data is still safe on this device.",
+        "Cloud backup failed. Your local data is still safe on this device."
       );
-      setErrorDetails(err instanceof Error ? err.message : String(err));
+      setErrorDetails(
+        err instanceof Error ? err.message : String(err)
+      );
     } finally {
       setLoading(false);
     }
@@ -59,7 +63,6 @@ export default function CloudBackupButton() {
     if (loading) return;
 
     setLoading(true);
-    setFailedAction("retrieve");
     resetFeedback();
 
     try {
@@ -72,16 +75,26 @@ export default function CloudBackupButton() {
 
       setMessage(
         `Cloud backup retrieved successfully. Created ${new Date(
-          backup.createdAt,
-        ).toLocaleString()}. Your local data has not been changed.`,
+          backup.createdAt
+        ).toLocaleString()}. Your local data has not been changed.`
       );
     } catch (err) {
       setFailed(true);
-      setFailedAction("backup");
+      setFailedAction("retrieve");
       setMessage("Could not retrieve your cloud backup.");
-      setErrorDetails(err instanceof Error ? err.message : String(err));
+      setErrorDetails(
+        err instanceof Error ? err.message : String(err)
+      );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRetry() {
+    if (failedAction === "retrieve") {
+      await handleRetrieval();
+    } else {
+      await handleBackup();
     }
   }
 
@@ -121,7 +134,9 @@ export default function CloudBackupButton() {
 
       {message && (
         <div
-          className={`small mt-2 ${failed ? "text-danger" : "text-success"}`}
+          className={`small mt-2 ${
+            failed ? "text-danger" : "text-success"
+          }`}
           role="status"
           aria-live="polite"
         >
@@ -132,9 +147,7 @@ export default function CloudBackupButton() {
               <button
                 type="button"
                 className="btn btn-outline-danger btn-sm w-100"
-                onClick={
-                  failedAction === "retrieve" ? handleRetrieval : handleBackup
-                }
+                onClick={handleRetry}
                 disabled={loading}
               >
                 Retry
@@ -143,7 +156,9 @@ export default function CloudBackupButton() {
               {errorDetails && (
                 <details className="mt-2">
                   <summary>Technical details</summary>
-                  <p className="mt-1 text-secondary">{errorDetails}</p>
+                  <p className="mt-1 text-secondary">
+                    {errorDetails}
+                  </p>
                 </details>
               )}
             </>
