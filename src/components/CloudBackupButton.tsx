@@ -1,24 +1,40 @@
 import { useState } from "react";
-import { uploadCloudBackup } from "../database/cloudBackup";
+import {
+  uploadCloudBackup,
+  retrieveCloudBackup,
+} from "../database/cloudBackup";
 
 const LAST_BACKUP_KEY = "cratefire:lastSuccessfulCloudBackup";
+const LAST_RETRIEVAL_KEY = "cratefire:lastSuccessfulCloudRetrieval";
 
 export default function CloudBackupButton() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [errorDetails, setErrorDetails] = useState("");
   const [failed, setFailed] = useState(false);
+
+  const [failedAction, setFailedAction] = useState<
+    "backup" | "retrieve" | null
+  >(null);
   const [lastBackup, setLastBackup] = useState(
-    () => localStorage.getItem(LAST_BACKUP_KEY) || ""
+    () => localStorage.getItem(LAST_BACKUP_KEY) || "",
   );
+  const [lastRetrieval, setLastRetrieval] = useState(
+    () => localStorage.getItem(LAST_RETRIEVAL_KEY) || "",
+  );
+
+  function resetFeedback() {
+    setMessage("");
+    setErrorDetails("");
+    setFailed(false);
+    setFailedAction(null);
+  }
 
   async function handleBackup() {
     if (loading) return;
 
     setLoading(true);
-    setMessage("");
-    setErrorDetails("");
-    setFailed(false);
+    resetFeedback();
 
     try {
       await uploadCloudBackup();
@@ -31,12 +47,39 @@ export default function CloudBackupButton() {
     } catch (err) {
       setFailed(true);
       setMessage(
-        "Cloud backup failed. Your local data is still safe on this device."
+        "Cloud backup failed. Your local data is still safe on this device.",
       );
+      setErrorDetails(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      setErrorDetails(
-        err instanceof Error ? err.message : String(err)
+  async function handleRetrieval() {
+    if (loading) return;
+
+    setLoading(true);
+    setFailedAction("retrieve");
+    resetFeedback();
+
+    try {
+      const backup = await retrieveCloudBackup();
+
+      const retrievedAt = new Date().toISOString();
+
+      localStorage.setItem(LAST_RETRIEVAL_KEY, retrievedAt);
+      setLastRetrieval(retrievedAt);
+
+      setMessage(
+        `Cloud backup retrieved successfully. Created ${new Date(
+          backup.createdAt,
+        ).toLocaleString()}. Your local data has not been changed.`,
       );
+    } catch (err) {
+      setFailed(true);
+      setFailedAction("backup");
+      setMessage("Could not retrieve your cloud backup.");
+      setErrorDetails(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -44,14 +87,25 @@ export default function CloudBackupButton() {
 
   return (
     <div className="mt-3">
-      <button
-        type="button"
-        className="btn btn-outline-light btn-sm w-100"
-        onClick={handleBackup}
-        disabled={loading}
-      >
-        {loading ? "Backing up..." : "Back Up to Cloud"}
-      </button>
+      <div className="d-flex gap-2">
+        <button
+          type="button"
+          className="btn btn-outline-light btn-sm flex-fill"
+          onClick={handleBackup}
+          disabled={loading}
+        >
+          {loading ? "Please wait..." : "Back Up to Cloud"}
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-outline-info btn-sm flex-fill"
+          onClick={handleRetrieval}
+          disabled={loading}
+        >
+          {loading ? "Please wait..." : "Retrieve from Cloud"}
+        </button>
+      </div>
 
       {lastBackup && (
         <p className="small text-secondary mt-2 mb-0">
@@ -59,11 +113,15 @@ export default function CloudBackupButton() {
         </p>
       )}
 
+      {lastRetrieval && (
+        <p className="small text-secondary mt-1 mb-0">
+          Last retrieval: {new Date(lastRetrieval).toLocaleString()}
+        </p>
+      )}
+
       {message && (
         <div
-          className={`small mt-2 ${
-            failed ? "text-danger" : "text-success"
-          }`}
+          className={`small mt-2 ${failed ? "text-danger" : "text-success"}`}
           role="status"
           aria-live="polite"
         >
@@ -74,18 +132,18 @@ export default function CloudBackupButton() {
               <button
                 type="button"
                 className="btn btn-outline-danger btn-sm w-100"
-                onClick={handleBackup}
+                onClick={
+                  failedAction === "retrieve" ? handleRetrieval : handleBackup
+                }
                 disabled={loading}
               >
-                Retry Backup
+                Retry
               </button>
 
               {errorDetails && (
                 <details className="mt-2">
                   <summary>Technical details</summary>
-                  <p className="mt-1 text-secondary">
-                    {errorDetails}
-                  </p>
+                  <p className="mt-1 text-secondary">{errorDetails}</p>
                 </details>
               )}
             </>
